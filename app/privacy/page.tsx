@@ -27,7 +27,9 @@ export default function Privacy() {
       </ul>
 
       <h2>Affiliate links</h2>
-      <p>Some links to travel and shopping sites are affiliate links. If you book or buy through them, we may earn a commission at no extra cost to you. Recommendations are based on your reading, not on commissions.</p>
+      <p>Some links to travel and shopping sites are affiliate links. If you book or buy through them, we may earn a commission at no extra cost to you. The planning and reading tools are general suggestions, not personalized chart prescriptions. Our Amazon links use fixed search keywords and the affiliate ID fatecal-20; they do not include your birth details, chart or calendar events. Amazon may use cookies or other identifiers when you visit its site.</p>
+
+      <p>As an Amazon Associate I earn from qualifying purchases. Read our <a href="/resources">affiliate disclosure and selection approach</a>.</p>
 
       <h2>Children</h2>
       <p>FateCal is not directed to children under 13, and we do not knowingly collect their information.</p>

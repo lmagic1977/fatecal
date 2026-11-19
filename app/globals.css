@@ -135,3 +135,11 @@ a { color: var(--red-ink); }
 }
 .addr { font-family: ui-monospace, Menlo, monospace; font-size: 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; overflow-wrap: anywhere; }
 .mail { border-top: 1px solid var(--line); padding-top: 10px; }
+
+.shopping h2 { font-family: 'Fraunces', 'Noto Sans SC', Georgia, serif; font-size: 21px; margin: 0 0 8px; }
+.shopping h3 { font-size: 15px; margin: 0 0 6px; }
+.shopping-item + .shopping-item { border-top: 1px solid var(--line); padding-top: 14px; }
+.shopping .affiliate-disclosure { color: var(--soft); background: var(--paper); border-radius: 8px; padding: 10px 12px; }
+.shopping-link { display: inline-flex; align-items: center; min-height: 44px; line-height: 1.4; }
+a:focus-visible { outline: 2px solid var(--red); outline-offset: 3px; }
+.legal .shopping { margin-top: 20px; }

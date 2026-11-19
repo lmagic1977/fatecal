@@ -7,6 +7,7 @@ import {
 import { T, Lang, almanac } from '@/lib/i18n';
 import { buildContext, fallbackAnswer, fmtDay, fmtHour } from '@/lib/bot';
 import Footer from '@/components/Footer';
+import ShoppingResources from '@/components/ShoppingResources';
 import { CONTACT_EMAIL } from '@/lib/site';
 import type { MailItem } from '@/lib/mail';
 
@@ -268,6 +269,7 @@ function Today({ lang, chart, events, manual, setManual }: { lang: Lang; chart: 
           onMove={(s, en) => setManual(manual.map((m) => (m.id === e.id ? { ...m, start: s, end: en } : m)))}
           onDelete={() => setManual(manual.filter((m) => m.id !== e.id))} />
       ))}
+      <ShoppingResources lang={lang} />
     </div>
   );
 }
