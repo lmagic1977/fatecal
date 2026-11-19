@@ -205,14 +205,6 @@ a:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 .display.sm { font-size: 28px; }
 .onboard .hero { display: flex; flex-direction: column; gap: 16px; }
 .onboard .hero .lead { color: var(--soft); font-size: 16px; }
-.demo { margin: 0 20px 28px; background: var(--brand); border-radius: 18px; padding: 16px; background-image: radial-gradient(circle at 110% -10%, rgba(255,255,255,.08) 0 40%, transparent 41%), radial-gradient(circle at -20% 120%, rgba(255,255,255,.06) 0 35%, transparent 36%); }
-.demo-k { color: #C9D6CC; margin-bottom: 10px; }
-.demo-card { background: #FFFDF8; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
-.wk { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-.wk span { text-align: center; font-size: 12px; padding: 8px 0; border-radius: 8px; background: var(--gray-bg); color: var(--muted); }
-.wk span.on { background: var(--brand); color: #fff; font-weight: 600; }
-.demo-ev { border-top: 1px solid var(--line); padding-top: 10px; gap: 10px; }
-.rec { background: var(--green-bg); border-radius: 10px; padding: 10px 12px; color: var(--brand-ink); }
 .feats { margin: 0 20px 24px; padding-top: 20px; border-top: 1px solid var(--line); display: grid; gap: 18px; }
 .feats h3 { font-family: 'Fraunces', 'Noto Serif SC', Georgia, serif; font-size: 19px; margin: 4px 0; }
 .faq { margin: 0 20px 24px; padding-top: 20px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
@@ -221,9 +213,116 @@ a:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 .faq details p { margin-top: 8px; }
 .startform { margin: 0 20px 14px; padding-top: 20px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; scroll-margin-top: 16px; }
 @media (min-width: 700px) {
-  .demo, .feats, .faq, .startform { margin-left: 40px; margin-right: 40px; }
+  .feats, .faq, .startform { margin-left: 40px; margin-right: 40px; }
   .feats { grid-template-columns: repeat(3, 1fr); }
   .feats.more > .eyebrow { grid-column: 1 / -1; }
   .display { font-size: 52px; }
 }
 .startform .seg, .onboard .hero .seg { align-self: flex-start; }
+
+/* Public landing page */
+.landing {
+  --brand: #4134c4;
+  --ink: #15172a;
+  --soft: #41465e;
+  --muted: #565c75;
+  --line: #e0e3ef;
+  --paper: #fff;
+  --landing-tint: #eeedff;
+  --page-gutter: clamp(20px, 5vw, 76px);
+  max-width: none;
+  box-shadow: none;
+}
+.landing .top {
+  width: min(100%, 1330px);
+  margin-inline: auto;
+  padding: 18px var(--page-gutter);
+}
+.landing-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -.05em;
+}
+.landing .lang,
+.landing .ghost { border-color: #d5d8e7; background: #fff; }
+.landing .lang { min-height: 44px; }
+.landing-hero {
+  display: grid;
+  align-items: center;
+  gap: clamp(24px, 4vw, 64px);
+  width: min(100%, 1330px);
+  margin-inline: auto;
+  padding: clamp(30px, 6vw, 86px) var(--page-gutter);
+  background: radial-gradient(ellipse at 85% 42%, #ecebff, transparent 70%), #f8f9ff;
+}
+.landing .hero { padding: 0; gap: 14px; }
+.landing .eyebrow { color: var(--brand); font-size: 14px; letter-spacing: 0; }
+.landing .eyebrow::before { display: none; }
+.landing .display { font-family: inherit; line-height: 1.05; letter-spacing: -.065em; }
+.landing h1.display { font-size: clamp(2.15rem, 6vw, 4.5rem); text-wrap: balance; }
+.landing[lang="zh-CN"] .display { letter-spacing: -.03em; }
+.landing .display.sm { font-size: clamp(1.75rem, 4vw, 2.5rem); }
+.landing .hero .lead { font-size: clamp(1rem, 1.7vw, 1.2rem); max-width: 33ch; }
+.landing .hero .row { margin-top: 4px; }
+.demo-note { font-size: .8125rem; color: var(--muted); }
+.landing .primary, .landing .ghost { font-weight: 600; }
+.landing .primary:hover:not(:disabled) { background: #33279e; }
+.landing .ghost:hover, .landing .lang:hover { background: #f3f3fe; }
+
+.demo {
+  min-width: 0;
+  border: 1px solid #e0dff1;
+  border-radius: 22px;
+  background: #fff;
+  padding: clamp(14px, 3vw, 26px);
+  box-shadow: 0 12px 34px #25214a15;
+  scroll-margin-top: 16px;
+}
+.demo-heading { margin-bottom: 16px; }
+.demo-heading h2 { margin: 4px 0 0; font-size: 1.45rem; letter-spacing: -.035em; }
+.demo-card { display: grid; gap: 14px; }
+.wk { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+.wk > div {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  border-radius: 10px;
+  padding: 9px 2px;
+  background: #f4f5fa;
+  color: var(--muted);
+  font-size: .875rem;
+}
+.wk b { color: var(--ink); font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.wk .on { background: var(--brand); color: #fff; font-weight: 600; }
+.wk .on b { color: inherit; }
+.demo-ev { border-top: 1px solid var(--line); padding-top: 12px; gap: 8px; flex-wrap: wrap; }
+.demo-ev .tag { font-size: .875rem; }
+.demo-time { font-size: .875rem; color: var(--muted); }
+.demo .ev-title { color: var(--ink); font-size: 1rem; }
+.rec { border-radius: 11px; padding: 10px 13px; background: var(--landing-tint); }
+.rec .demo-time { color: var(--brand); }
+.rec b { display: block; margin-top: 3px; font-size: 1.125rem; }
+.demo-actions { column-gap: 14px; row-gap: 2px; }
+.demo-actions .link { display: inline-flex; align-items: center; gap: 7px; font-size: .875rem; }
+.demo-trigram { display: inline-grid; gap: 2px; width: 14px; flex: none; }
+.demo-trigram i { display: block; height: 2px; background: currentColor; }
+.demo-trigram i:nth-child(2) { background: linear-gradient(to right, currentColor 38%, transparent 38% 62%, currentColor 62%); }
+.demo-reason { color: var(--soft); font-size: .875rem; }
+
+.landing .feats, .landing .faq, .landing .startform, .landing > .form, .landing > .card, .landing > .pad {
+  width: min(100% - 2 * var(--page-gutter), 1178px);
+  margin-inline: auto;
+}
+.landing .feats { padding-block: 24px; margin-bottom: 0; }
+.landing .feats h3 { font-family: inherit; }
+.landing .feats p, .landing .faq p { font-size: 1rem; }
+.landing .faq, .landing .startform, .landing > .form, .landing > .card, .landing > .pad { max-width: 690px; }
+.landing > .pad { padding-inline: 0; }
+
+@media (min-width: 900px) {
+  .landing-hero { grid-template-columns: minmax(0, 1.04fr) minmax(0, 1fr); border-radius: 28px; }
+  .landing .hero { gap: 18px; }
+}
