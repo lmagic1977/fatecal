@@ -9,7 +9,7 @@ import { buildContext, fallbackAnswer, fmtDay, fmtHour } from '@/lib/bot';
 import Footer from '@/components/Footer';
 import { signIn, signOut } from 'next-auth/react';
 import ShoppingResources from '@/components/ShoppingResources';
-import { CONTACT_EMAIL } from '@/lib/site';
+import { CONTACT_EMAIL, ACCOUNTS_ON } from '@/lib/site';
 import type { MailItem } from '@/lib/mail';
 import { Sex, Dir, DIRS, DIR_NAME, DIR_ELEMENT, STAR8, FLY, kuaOf, annualStars, liChunYear, yearGanZhi, readHome, dirFromDegrees } from '@/lib/fengshui';
 
@@ -80,6 +80,7 @@ export default function App() {
   // Accounts: when signed in, the chart, events and settings are kept on the server and follow the user.
   useEffect(() => {
     if (!ready) return;
+    if (!ACCOUNTS_ON) { synced.current = true; setAuthed('out'); return; }
     fetch('/api/auth/providers-list').then((r) => r.json()).then((j) => setProviders(j.providers ?? [])).catch(() => {});
     fetch('/api/sync').then((r) => (r.ok ? r.json() : null)).then((j) => {
       if (!j?.user) { synced.current = true; setAuthed('out'); return; }
@@ -153,9 +154,10 @@ export default function App() {
 
   // Before local data loads (and on the server) show the onboarding screen, so the page has real content for search engines.
   // Everyone signs up first (Google, Facebook, email or phone), then fills in their birth details.
-  if (!ready) return <div className="preload"><Landing lang={lang} setLang={setLang} providers={[]} /></div>;
-  if (authed === 'checking') return <div className="shell onboard"><div className="hero"><div className="brand big">FateCal</div><p className="muted" aria-live="polite">{t.loading}</p></div></div>;
-  if (authed === 'out') return <Landing lang={lang} setLang={setLang} providers={providers} />;
+  if (!ready) return <div className="preload"><Landing lang={lang} setLang={setLang} providers={[]} onDone={() => {}} /></div>;
+  if (!ACCOUNTS_ON && (!profile || !chart)) return <Landing lang={lang} setLang={setLang} providers={[]} onDone={(p) => { setProfile(p); save(K.profile, p); }} />;
+  if (ACCOUNTS_ON && authed === 'checking') return <div className="shell onboard"><div className="hero"><div className="brand big">FateCal</div><p className="muted" aria-live="polite">{t.loading}</p></div></div>;
+  if (ACCOUNTS_ON && authed === 'out') return <Landing lang={lang} setLang={setLang} providers={providers} onDone={() => {}} />;
   if (!profile || !chart) {
     return <Onboarding lang={lang} setLang={setLang} initial={null} account={account} onDone={(p) => { setProfile(p); save(K.profile, p); }} />;
   }
@@ -191,7 +193,7 @@ export default function App() {
 
 // ---------------- onboarding ----------------
 
-function Onboarding({ lang, setLang, initial, onDone, onCancel, account = null }: { lang: Lang; setLang: (l: Lang) => void; initial: Profile | null; onDone: (p: Profile) => void; onCancel?: () => void; account?: Account | null }) {
+function Onboarding({ lang, setLang, initial, onDone, onCancel, account = null, embedded = false }: { lang: Lang; setLang: (l: Lang) => void; initial: Profile | null; onDone: (p: Profile) => void; onCancel?: () => void; account?: Account | null; embedded?: boolean }) {
   const t = T[lang];
   const b = initial?.birth;
   const [name, setName] = useState(initial?.name ?? '');
@@ -202,19 +204,7 @@ function Onboarding({ lang, setLang, initial, onDone, onCancel, account = null }
   const [sex, setSex] = useState<Sex | undefined>(initial?.sex);
   const valid = /^\d{4}-\d{2}-\d{2}$/.test(date) && (unknown || /^\d{2}:\d{2}$/.test(time));
 
-  return (
-    <div className="shell onboard">
-      {!initial && (
-        <div className="hero">
-          <div className="brand big">FateCal</div>
-          <h1>{t.welcome}{account?.name && !account.name.includes('@') && !account.name.includes('*') ? `, ${account.name}` : ''}</h1>
-          <p className="muted">{t.profileIntro}</p>
-          <div className="seg">
-            <button className={lang === 'en' ? 'on' : ''} onClick={() => setLang('en')}>English</button>
-            <button className={lang === 'zh' ? 'on' : ''} onClick={() => setLang('zh')}>中文</button>
-          </div>
-        </div>
-      )}
+  const form = () => (
       <form className="card form" onSubmit={(e) => {
         e.preventDefault();
         if (!valid) return;
@@ -238,6 +228,22 @@ function Onboarding({ lang, setLang, initial, onDone, onCancel, account = null }
         <button className="primary" disabled={!valid}>{initial ? t.save : t.continue}</button>
         {onCancel && <button type="button" className="ghost" onClick={onCancel}>{t.cancel}</button>}
       </form>
+  );
+  if (embedded) return <>{form()}</>;
+  return (
+    <div className="shell onboard">
+      {!initial && (
+        <div className="hero">
+          <div className="brand big">FateCal</div>
+          <h1>{t.welcome}{account?.name && !account.name.includes('@') && !account.name.includes('*') ? `, ${account.name}` : ''}</h1>
+          <p className="muted">{t.profileIntro}</p>
+          <div className="seg">
+            <button className={lang === 'en' ? 'on' : ''} onClick={() => setLang('en')}>English</button>
+            <button className={lang === 'zh' ? 'on' : ''} onClick={() => setLang('zh')}>中文</button>
+          </div>
+        </div>
+      )}
+      {form()}
       <p className="muted small pad">{t.simplified}</p>
       {!initial && <Footer lang={lang} />}
     </div>
@@ -246,7 +252,7 @@ function Onboarding({ lang, setLang, initial, onDone, onCancel, account = null }
 
 // ---------------- landing and sign-up ----------------
 
-function Landing({ lang, setLang, providers }: { lang: Lang; setLang: (l: Lang) => void; providers: string[] }) {
+function Landing({ lang, setLang, providers, onDone }: { lang: Lang; setLang: (l: Lang) => void; providers: string[]; onDone: (p: Profile) => void }) {
   const t = T[lang];
   return (
     <div className="shell onboard">
@@ -275,7 +281,7 @@ function Landing({ lang, setLang, providers }: { lang: Lang; setLang: (l: Lang) 
           <button className={lang === 'zh' ? 'on' : ''} onClick={() => setLang('zh')}>中文</button>
         </div>
       </div>
-      <SignUp lang={lang} providers={providers} />
+      {ACCOUNTS_ON ? <SignUp lang={lang} providers={providers} /> : <Onboarding lang={lang} setLang={setLang} initial={null} onDone={onDone} embedded />}
       <p className="muted small pad">{t.simplified}</p>
       <Footer lang={lang} />
     </div>

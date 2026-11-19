@@ -8,13 +8,14 @@ export default function Privacy() {
   return (
     <LegalPage title="Privacy Policy" updated="November 19, 2026">
       <h2>The short version</h2>
-      <p>To use FateCal you create an account with Google, Facebook, your email address or your mobile number. Your birth details, chart and events are kept privately in that account so they follow you across devices, and a copy is kept in your browser. We do not sell your personal information.</p>
+      <p>You can use FateCal without an account: your birth details, chart and events stay in your own browser (local storage). When sign-in is available and you use it, we keep them privately in your account so they follow you across devices. We do not sell your personal information.</p>
 
       <h2>What we process</h2>
       <ul>
-        <li><b>Sign-in</b>: if you continue with Google or Facebook, we receive your name, email address and profile picture from them, and a user ID. If you use your email address or mobile number, we send a one-time code to it; for email we briefly keep a scrambled (hashed) copy of the code for up to 10 minutes. We use these only to identify your account and keep it secure.</li>
+        <li><b>Sign-in</b> (when offered): if you continue with Google or Facebook, we receive your name, email address and profile picture from them, and a user ID. If you use your email address or mobile number, we send a one-time code to it; for email we briefly keep a scrambled (hashed) copy of the code for up to 10 minutes. We use these only to identify your account and keep it secure.</li>
         <li><b>Account data</b>: when signed in, your birth details (and sex, if you chose it for feng shui directions), chart, manually added events, language, calendar link and forwarding-address key are stored privately on our host so you can use them on any device. Signing out or Settings → Reset all data removes the copy on your device; to delete your account data on our side, email us.</li>
         <li><b>Phone compass</b>: if you use the compass on the Feng Shui screen, the heading is read in your browser only to pick a direction and is never sent to us.</li>
+        <li><b>Without an account</b>, birth details and events you enter stay in your browser. Clearing your browser data, or using Settings → Reset, deletes them.</li>
         <li><b>Calendar links</b> (iCal/.ics) you connect are fetched by our server so your events can be read. We pass the events back to your browser and do not store the events; the link itself is stored only if you are signed in.</li>
         <li><b>Questions to FateBot</b> are sent from our server, together with the relevant parts of your reading (chart, day scores and upcoming events), to our AI provider, Anthropic, to write the answer. We do not keep a copy of your questions or answers.</li>
         <li><b>Technical logs</b>: our host, Vercel, keeps standard server logs (such as IP address, browser type and request time) for security and reliability.</li>
