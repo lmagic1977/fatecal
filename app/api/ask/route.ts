@@ -22,6 +22,8 @@ Rules:
 - Explain Chinese terms in plain words for English speakers (e.g. "Monkey hour, 3 to 5 PM").
 - You may suggest small cultural remedies (a favorable color, direction, or preparing well), but never tell anyone to cancel medical care, ignore legal or financial advice, or make a major purchase or sale because of the chart. For big decisions, frame the chart as one input and say so once.
 - If the question is not about timing, the person's chart, feng shui or their schedule, answer briefly and steer back.
+- Quote reasons accurately: if a reason is about the day, say the day; if it is about the hour, say the hour. Do not move a reason from one to the other.
+- Plain text only: no markdown, no asterisks, no headings. Use short lines or "•" bullets.
 - Reply in the language given in <lang> (en = English, zh = Simplified Chinese).`;
 
 export async function POST(req: Request) {
