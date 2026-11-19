@@ -4,6 +4,9 @@
 // branch clashes / harmonies / harms, almanac yi-ji). Have a BaZi consultant review before launch.
 
 import { Solar } from 'lunar-javascript';
+import { ALMANAC_EN } from './i18n';
+
+const gl = (w: string) => ALMANAC_EN[w] ?? w;
 
 export type Element = 'wood' | 'fire' | 'earth' | 'metal' | 'water';
 export type Verdict = 'good' | 'neutral' | 'bad';
@@ -11,7 +14,8 @@ export type Category =
   | 'meeting' | 'signing' | 'travel' | 'moving' | 'money' | 'build' | 'wedding' | 'medical'
   | 'conception' | 'romance' | 'opening' | 'haircut' | 'study' | 'cleaning' | 'general';
 
-export interface Reason { delta: number; en: string; zh: string }
+export type Scope = 'day' | 'hour' | 'almanac-day' | 'almanac-hour';
+export interface Reason { delta: number; en: string; zh: string; scope: Scope }
 
 export interface BirthInput { year: number; month: number; day: number; hour: number; minute: number; hourUnknown?: boolean }
 
@@ -54,6 +58,12 @@ export const BRANCH: Record<string, { el: Element; pinyin: string; animal: strin
   午: { el: 'fire', pinyin: 'Wu', animal: 'Horse', zh: '马' }, 未: { el: 'earth', pinyin: 'Wei', animal: 'Goat', zh: '羊' },
   申: { el: 'metal', pinyin: 'Shen', animal: 'Monkey', zh: '猴' }, 酉: { el: 'metal', pinyin: 'You', animal: 'Rooster', zh: '鸡' },
   戌: { el: 'earth', pinyin: 'Xu', animal: 'Dog', zh: '狗' }, 亥: { el: 'water', pinyin: 'Hai', animal: 'Pig', zh: '猪' },
+};
+
+// hidden stems (藏干) of each branch, main stem first
+export const HIDDEN: Record<string, string[]> = {
+  子: ['癸'], 丑: ['己', '癸', '辛'], 寅: ['甲', '丙', '戊'], 卯: ['乙'], 辰: ['戊', '乙', '癸'], 巳: ['丙', '戊', '庚'],
+  午: ['丁', '己'], 未: ['己', '丁', '乙'], 申: ['庚', '壬', '戊'], 酉: ['辛'], 戌: ['戊', '辛', '丁'], 亥: ['壬', '甲'],
 };
 
 export const ELEMENT_NAME: Record<Element, { en: string; zh: string }> = {
@@ -120,7 +130,10 @@ export function computeChart(b: BirthInput): Chart {
   const counts: Record<Element, number> = { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 };
   for (const p of used) {
     counts[STEM[p.stem].el] += 1;
-    counts[BRANCH[p.branch].el] += p.label === 'month' ? 2 : 1; // the month branch (season) weighs double
+    // a branch counts through its hidden stems (main / middle / residual), and the month branch (season) weighs double
+    const hs = HIDDEN[p.branch];
+    const w = hs.length === 1 ? [1] : hs.length === 2 ? [0.7, 0.3] : [0.6, 0.3, 0.1];
+    hs.forEach((st, i) => { counts[STEM[st].el] += w[i] * (p.label === 'month' ? 2 : 1); });
   }
   const dm = pillars[2].stem;
   const dmEl = STEM[dm].el;
@@ -131,6 +144,7 @@ export function computeChart(b: BirthInput): Chart {
     ? [GENERATES[dmEl], CONTROLS[dmEl], controlledBy(dmEl)] // output, wealth, officer drain a strong day master
     : [generatedBy(dmEl), dmEl]; // resource and companion support a weak one
   const unfavorable = (Object.keys(counts) as Element[]).filter((e) => !favorable.includes(e));
+  (Object.keys(counts) as Element[]).forEach((k) => { counts[k] = Math.round(counts[k] * 10) / 10; });
   return {
     pillars, dayMaster: dm, dayMasterElement: dmEl, dayBranch: pillars[2].branch, yearBranch: pillars[0].branch,
     counts, strong, favorable, unfavorable, sunSign: sunSign(b.month, b.day), hourUnknown: !!b.hourUnknown,
@@ -192,7 +206,8 @@ export function scoreMoment(chart: Chart, when: Date, category: Category = 'gene
   const hourStem: string = lunar.getTimeGan();
   const hourBranch: string = lunar.getTimeZhi();
   const reasons: Reason[] = [];
-  const add = (delta: number, en: string, zh: string) => reasons.push({ delta, en, zh });
+  let scope: Scope = 'day';
+  const add = (delta: number, en: string, zh: string) => reasons.push({ delta, en, zh, scope });
   const dm = `${STEM[chart.dayMaster].pinyin} ${ELEMENT_NAME[chart.dayMasterElement].en}`;
   const dmZh = `${chart.dayMaster}${ELEMENT_NAME[chart.dayMasterElement].zh}`;
 
@@ -216,6 +231,7 @@ export function scoreMoment(chart: Chart, when: Date, category: Category = 'gene
     add(-6, `The day clashes with your zodiac sign (${BRANCH[chart.yearBranch].animal}).`, `当日冲你的生肖（属${BRANCH[chart.yearBranch].zh}）。`);
 
   // 3. hour branch vs natal day branch
+  scope = 'hour';
   {
     const hb = branchLabel(hourBranch);
     const hRel = branchRelation(hourBranch, chart.dayBranch);
@@ -234,13 +250,16 @@ export function scoreMoment(chart: Chart, when: Date, category: Category = 'gene
     const hourYi: string[] = lunar.getTimeYi(), hourJi: string[] = lunar.getTimeJi();
     const hit = (list: string[]) => words.find((w) => list.includes(w));
     let w: string | undefined;
-    if ((w = hit(dayYi))) add(7, `The almanac favors this kind of activity that day (${w}).`, `黄历当日宜「${w}」。`);
-    if ((w = hit(dayJi))) add(-10, `The almanac advises against this kind of activity that day (${w}).`, `黄历当日忌「${w}」。`);
-    if ((w = hit(hourYi))) add(3, `This hour suits it (${w}).`, `此时宜「${w}」。`);
-    if ((w = hit(hourJi))) add(-5, `This hour is unsuited to it (${w}).`, `此时忌「${w}」。`);
+    scope = 'almanac-day';
+    if ((w = hit(dayYi))) add(7, `The almanac favors this that day (${gl(w)}).`, `黄历当日宜「${w}」。`);
+    if ((w = hit(dayJi))) add(-10, `The almanac advises against this that day (${gl(w)}).`, `黄历当日忌「${w}」。`);
+    scope = 'almanac-hour';
+    if ((w = hit(hourYi))) add(3, `This hour suits it (${gl(w)}).`, `此时宜「${w}」。`);
+    if ((w = hit(hourJi))) add(-5, `This hour is unsuited to it (${gl(w)}).`, `此时忌「${w}」。`);
   }
 
   // 5. day officer (建除十二值星)
+  scope = 'day';
   const officer: string = lunar.getZhiXing();
   if (officer === '破') add(-6, 'A "Break" day in the almanac: avoid starting important things.', '当日值「破」，不宜开始大事。');
   if (officer === '成' || officer === '开') add(4, `An "${officer === '成' ? 'Success' : 'Open'}" day in the almanac.`, `当日值「${officer}」，利于成事。`);
@@ -257,13 +276,48 @@ export interface DaySummary {
 export function scoreDay(chart: Chart, date: Date): DaySummary {
   const noon = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
   const base = scoreMoment(chart, noon, 'general');
-  const dayOnly = base.reasons.filter((r) => !/hour|时/.test(r.en + r.zh));
+  const dayOnly = base.reasons.filter((r) => r.scope === 'day');
   const lunar = Solar.fromDate(noon).getLunar();
   const hours = [7, 9, 11, 13, 15, 17, 19].map((h) => ({
     start: h, score: scoreMoment(chart, new Date(date.getFullYear(), date.getMonth(), date.getDate(), h, 30), 'general').score,
   })).sort((a, b) => b.score - a.score);
   const score = Math.max(5, Math.min(98, 60 + dayOnly.reduce((a, r) => a + r.delta, 0)));
   return { score, verdict: verdictOf(score), ganZhi: base.dayGanZhi, yi: lunar.getDayYi(), ji: lunar.getDayJi(), reasons: dayOnly, bestHours: hours.slice(0, 2).sort((a, b) => a.start - b.start) };
+}
+
+// Modern activities shown as "good for / avoid" in place of the raw almanac list.
+export const ACTIVITIES: { cat: Category; en: string; zh: string }[] = [
+  { cat: 'meeting', en: 'meetings & negotiations', zh: '会面谈判' },
+  { cat: 'signing', en: 'signing contracts', zh: '签约' },
+  { cat: 'travel', en: 'travel', zh: '出行' },
+  { cat: 'opening', en: 'launches & openings', zh: '发布开业' },
+  { cat: 'money', en: 'big purchases', zh: '大额消费' },
+  { cat: 'moving', en: 'moving house', zh: '搬家' },
+  { cat: 'romance', en: 'dates & proposals', zh: '约会求婚' },
+  { cat: 'medical', en: 'medical visits', zh: '就医' },
+  { cat: 'haircut', en: 'haircuts', zh: '理发' },
+];
+export const activityName = (c: Category, lang: 'en' | 'zh') => {
+  const a = ACTIVITIES.find((x) => x.cat === c);
+  if (a) return lang === 'zh' ? a.zh : a.en;
+  return ({ build: ['renovation', '装修动土'], wedding: ['weddings', '婚嫁'], conception: ['trying for a baby', '求子'], study: ['study & exams', '学习考试'], cleaning: ['cleaning', '打扫'], general: ['this', '此事'] } as Record<string, string[]>)[c]?.[lang === 'zh' ? 1 : 0] ?? c;
+};
+
+export function dayActivities(chart: Chart, date: Date) {
+  const noon = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0);
+  const good: { cat: Category; score: number }[] = [], avoid: { cat: Category; score: number }[] = [];
+  for (const a of ACTIVITIES) {
+    const m = scoreMoment(chart, noon, a.cat);
+    const rs = m.reasons.filter((r) => r.scope === 'day' || r.scope === 'almanac-day');
+    const score = Math.max(5, Math.min(98, 60 + rs.reduce((x, r) => x + r.delta, 0)));
+    const yi = rs.some((r) => r.scope === 'almanac-day' && r.delta > 0);
+    const ji = rs.some((r) => r.scope === 'almanac-day' && r.delta < 0);
+    if (ji || score < 52) avoid.push({ cat: a.cat, score });
+    else if (yi && score >= 60 || score >= 72) good.push({ cat: a.cat, score });
+  }
+  good.sort((a, b) => b.score - a.score);
+  avoid.sort((a, b) => a.score - b.score);
+  return { good, avoid };
 }
 
 export interface CalEvent { id: string; title: string; start: string; end: string; allDay?: boolean; source: 'manual' | 'calendar' }
@@ -279,7 +333,7 @@ export function readEvent(chart: Chart, ev: CalEvent, all: CalEvent[]): EventRea
   const category = categorize(ev.title);
   const base = scoreMoment(chart, start, category);
   const alternatives: EventReading['alternatives'] = [];
-  if (!ev.allDay && base.verdict !== 'good') {
+  if (!ev.allDay) {
     const dur = Math.max(30 * 60e3, end.getTime() - start.getTime());
     const busy = all.filter((o) => o.id !== ev.id && !o.allDay).map((o) => [new Date(o.start).getTime(), new Date(o.end).getTime()]);
     const cands: EventReading['alternatives'] = [];
@@ -290,6 +344,7 @@ export function readEvent(chart: Chart, ev: CalEvent, all: CalEvent[]): EventRea
         const e = new Date(s.getTime() + dur);
         if (busy.some(([b0, b1]) => overlaps(s.getTime(), e.getTime(), b0, b1))) continue;
         const sc = scoreMoment(chart, new Date(s.getTime() + 30 * 60e3), category);
+        if (base.verdict === 'good' && d > 0) continue;
         if (sc.score >= base.score + 8 && sc.verdict !== 'bad') cands.push({ start: s.toISOString(), end: e.toISOString(), score: sc.score, verdict: sc.verdict });
       }
     }

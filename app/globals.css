@@ -101,3 +101,35 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--red); outli
 .tab { flex: 1; min-height: 60px; border: none; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--muted); font-size: 12px; font-weight: 500; }
 .tab.on { color: var(--red); }
 .chat { padding-bottom: 70px; }
+
+/* --- v2 additions --- */
+.preload { visibility: visible; }
+.link { min-height: 44px; padding: 10px 4px; }
+.link.light { color: var(--gold); padding: 6px 0; min-height: 36px; text-align: left; }
+.btnlink { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; margin-top: 8px; }
+.sample { display: flex; flex-direction: column; gap: 10px; }
+.points { margin: 0; padding-left: 20px; color: var(--soft); line-height: 1.7; }
+.explain summary { cursor: pointer; font-weight: 500; min-height: 36px; display: flex; align-items: center; }
+.explain p { margin-top: 6px; color: var(--soft); }
+.footer { display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: center; padding: 20px 20px 28px; font-size: 13px; color: var(--muted); }
+.footer a { color: var(--muted); min-height: 36px; display: inline-flex; align-items: center; }
+.footer span { display: inline-flex; align-items: center; min-height: 36px; }
+.legal .main { padding-bottom: 24px; }
+.legal h2 { font-family: 'Fraunces', Georgia, serif; font-size: 19px; margin: 22px 0 6px; }
+.legal ul { padding-left: 20px; line-height: 1.6; }
+.legal p, .legal li { color: var(--soft); }
+a { color: var(--red-ink); }
+.dots::after { content: ''; animation: dots 1.2s steps(4) infinite; }
+@keyframes dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } }
+
+/* desktop: a wider column with room to breathe */
+@media (min-width: 768px) {
+  .shell { max-width: 640px; box-shadow: 0 0 0 1px var(--line); }
+  .tabs, .composer { width: min(640px, 100%); }
+  .main { padding: 24px 40px 120px; }
+  .top { padding: 18px 40px 0; }
+  h1 { font-size: 32px; }
+  .hero { padding: 64px 40px 24px; }
+  .onboard .form { margin: 0 40px 16px; }
+  .pad { padding: 0 40px 24px; }
+}

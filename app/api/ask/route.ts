@@ -29,6 +29,7 @@ Rules:
 - Plain text only: no markdown, no asterisks, no headings. Use short lines or "•" bullets.
 - Keep the whole answer under about 180 words (or 300 Chinese characters).
 - In Chinese replies write verdicts as 吉 / 平 / 凶 and hours as 申时（下午3–5点）; no English words.
+- In English replies use no Chinese characters at all: translate almanac terms (e.g. 会亲友 → visiting friends and family, 立券 → signing contracts) and call pillars by pinyin (Geng-Shen day).
 - Reply in the language given in <lang> (en = English, zh = Simplified Chinese).`;
 
 export async function POST(req: Request) {
@@ -40,7 +41,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   if (!body || typeof body.question !== 'string') return NextResponse.json({ error: 'bad_request' }, { status: 400 });
   const question = body.question.slice(0, 1000);
-  const context = JSON.stringify(body.context ?? {}).slice(0, 30000);
+  const context = JSON.stringify(body.context ?? {}).slice(0, 60000);
   const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
   const lang = body.lang === 'zh' ? 'zh' : 'en';
 
@@ -54,16 +55,27 @@ export async function POST(req: Request) {
   // the API requires the first message to be from the user
   while (messages.length && messages[0].role !== 'user') messages.shift();
 
-  try {
-    const res = await client.messages.create({
-      model: process.env.FATECAL_MODEL || 'claude-haiku-5-5',
-      max_tokens: 4000,
-      system: SYSTEM,
-      messages,
-    });
-    const text = res.content.map((c: any) => (c.type === 'text' ? c.text : '')).join('').trim();
-    return NextResponse.json({ answer: text });
-  } catch (e: any) {
-    return NextResponse.json({ error: 'ai_failed', detail: String(e?.message ?? e).slice(0, 200) }, { status: 502 });
-  }
+  // Stream plain text back so the reply appears as it is written.
+  const stream = client.messages.stream({
+    model: process.env.FATECAL_MODEL || 'claude-haiku-5-5',
+    max_tokens: 4000,
+    system: SYSTEM,
+    messages,
+  });
+  const enc = new TextEncoder();
+  const body2 = new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const ev of stream as any) {
+          if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') controller.enqueue(enc.encode(ev.delta.text));
+        }
+        controller.close();
+      } catch (e: any) {
+        controller.enqueue(enc.encode('\u0000ERROR'));
+        controller.close();
+      }
+    },
+    cancel() { stream.abort(); },
+  });
+  return new Response(body2, { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
 }

@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  BirthInput, CalEvent, Chart, computeChart, readEvent, scoreDay, STEM, BRANCH, ELEMENT_NAME, Element,
+  BirthInput, CalEvent, Chart, computeChart, readEvent, scoreDay, dayActivities, activityName, STEM, BRANCH, ELEMENT_NAME, Element, HIDDEN,
 } from '@/lib/engine';
 import { T, Lang, almanac } from '@/lib/i18n';
 import { buildContext, fallbackAnswer, fmtDay, fmtHour } from '@/lib/bot';
+import Footer from '@/components/Footer';
+import { CONTACT_EMAIL } from '@/lib/site';
 
 interface Profile { name: string; birth: BirthInput; place: string }
 type Tab = 'today' | 'ask' | 'chart' | 'settings';
@@ -58,7 +60,8 @@ export default function App() {
   const events = useMemo(() => [...manual, ...(ics?.events ?? [])].sort((a, b) => a.start.localeCompare(b.start)), [manual, ics]);
   const t = T[lang];
 
-  if (!ready) return <div className="shell" />;
+  // Before local data loads (and on the server) show the onboarding screen, so the page has real content for search engines.
+  if (!ready) return <div className="preload"><Onboarding lang={lang} setLang={setLang} initial={null} onDone={() => {}} /></div>;
   if (!profile || !chart) {
     return <Onboarding lang={lang} setLang={setLang} initial={null} onDone={(p) => { setProfile(p); save(K.profile, p); }} />;
   }
@@ -80,7 +83,7 @@ export default function App() {
       </main>
       <nav className="tabs">
         {(['today', 'ask', 'chart', 'settings'] as Tab[]).map((k) => (
-          <button key={k} className={tab === k ? 'tab on' : 'tab'} onClick={() => setTab(k)} aria-current={tab === k ? 'page' : undefined}>
+          <button key={k} className={tab === k ? 'tab on' : 'tab'} onClick={() => setTab(k)} aria-current={tab === k ? 'page' : undefined} aria-label={t[k]}>
             <Icon name={k} />
             <span>{t[k]}</span>
           </button>
@@ -107,6 +110,27 @@ function Onboarding({ lang, setLang, initial, onDone, onCancel }: { lang: Lang; 
       <div className="hero">
         <div className="brand big">FateCal</div>
         <p className="lead">{t.tagline}</p>
+        {!initial && (
+          <>
+            <div className="card sample" aria-label={t.sampleLabel}>
+              <div className="tiny">{t.sampleLabel}</div>
+              <div className="row gap top-align">
+                <div className="time">2:00 PM</div>
+                <div className="grow">
+                  <div className="ev-title">{t.sampleTitle}</div>
+                  <div className="muted small">{t.sampleWhy}</div>
+                </div>
+                <span className="tag bad">{t.bad}</span>
+              </div>
+              <div className="suggest small">{t.sampleSuggest}</div>
+            </div>
+            <ul className="points">{t.points.map((x) => <li key={x}>{x}</li>)}</ul>
+            <details className="explain">
+              <summary>{t.whatIsBazi}</summary>
+              <p className="small">{t.baziExplain}</p>
+            </details>
+          </>
+        )}
         <div className="seg">
           <button className={lang === 'en' ? 'on' : ''} onClick={() => setLang('en')}>English</button>
           <button className={lang === 'zh' ? 'on' : ''} onClick={() => setLang('zh')}>中文</button>
@@ -124,11 +148,12 @@ function Onboarding({ lang, setLang, initial, onDone, onCancel }: { lang: Lang; 
         <label>{t.birthTime}<input type="time" value={time} disabled={unknown} onChange={(e) => setTime(e.target.value)} /></label>
         <label className="check"><input type="checkbox" checked={unknown} onChange={(e) => setUnknown(e.target.checked)} />{t.timeUnknown}</label>
         <label>{t.birthPlace}<input value={place} onChange={(e) => setPlace(e.target.value)} placeholder="Shanghai / Los Angeles" /></label>
-        <p className="muted small">{t.birthPlaceHint}</p>
+        <p className="muted small">{t.birthPlaceHint} {t.privacyShort}</p>
         <button className="primary" disabled={!valid}>{initial ? t.save : t.continue}</button>
         {onCancel && <button type="button" className="ghost" onClick={onCancel}>{t.cancel}</button>}
       </form>
       <p className="muted small pad">{t.simplified}</p>
+      {!initial && <Footer lang={lang} />}
     </div>
   );
 }
@@ -144,6 +169,9 @@ function Today({ lang, chart, events, manual, setManual }: { lang: Lang; chart: 
   const [day, setDay] = useState(() => new Date());
   const [adding, setAdding] = useState(false);
   const summary = useMemo(() => scoreDay(chart, day), [chart, day]);
+  const acts = useMemo(() => dayActivities(chart, day), [chart, day]);
+  const [trad, setTrad] = useState(false);
+  const sep = lang === 'zh' ? '、' : ', ';
   const todays = events.filter((e) => sameDay(new Date(e.start), day));
   const shift = (n: number) => setDay(new Date(day.getFullYear(), day.getMonth(), day.getDate() + n));
   const isToday = sameDay(day, new Date());
@@ -163,8 +191,15 @@ function Today({ lang, chart, events, manual, setManual }: { lang: Lang; chart: 
         <div className="ring"><b>{summary.score}</b><span>{t.dayScore}</span></div>
         <div className="grow">
           <div className="row gap"><VerdictTag v={summary.verdict} lang={lang} /><span>{t.verdictLine[summary.verdict]}</span></div>
-          <p className="small soft"><b>{t.goodFor}:</b> {summary.yi.slice(0, 5).map((w) => almanac(w, lang)).join(lang === 'zh' ? '、' : ', ')}</p>
-          <p className="small soft"><b>{t.avoid}:</b> {summary.ji.slice(0, 5).map((w) => almanac(w, lang)).join(lang === 'zh' ? '、' : ', ')}</p>
+          <p className="small soft"><b>{t.goodFor}:</b> {acts.good.length ? acts.good.slice(0, 4).map((a) => activityName(a.cat, lang)).join(sep) : t.routineOnly}</p>
+          <p className="small soft"><b>{t.avoid}:</b> {acts.avoid.length ? acts.avoid.slice(0, 4).map((a) => activityName(a.cat, lang)).join(sep) : t.nothingMajor}</p>
+          <button className="link light" onClick={() => setTrad(!trad)} aria-expanded={trad}>{trad ? t.hideAlmanac : t.showAlmanac}</button>
+          {trad && (
+            <div className="small soft">
+              <p><b>{lang === 'zh' ? '宜' : 'Almanac yi'}:</b> {summary.yi.map((w) => almanac(w, lang)).join(sep)}</p>
+              <p><b>{lang === 'zh' ? '忌' : 'Almanac ji'}:</b> {summary.ji.map((w) => almanac(w, lang)).join(sep)}</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -226,7 +261,10 @@ function EventCard({ lang, chart, ev, all, onMove, onDelete }: { lang: Lang; cha
   const r = useMemo(() => readEvent(chart, ev, all), [chart, ev, all]);
   const [why, setWhy] = useState(false);
   const [copied, setCopied] = useState(false);
-  const top = [...r.reasons].sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0];
+  // lead with what is specific to this event: the almanac for its activity, then its hour, then the day
+  const rank = (x: { scope: string }) => (x.scope.startsWith('almanac') ? 0 : x.scope === 'hour' ? 1 : 2);
+  const tops = [...r.reasons].sort((a, b) => rank(a) - rank(b) || Math.abs(b.delta) - Math.abs(a.delta)).slice(0, 2);
+  const actLabel = r.category === 'general' ? '' : (lang === 'zh' ? `${activityName(r.category, lang)}：` : `For ${activityName(r.category, lang)}: `);
   const alt = r.alternatives[0];
   const altLabel = alt ? `${sameDay(new Date(alt.start), new Date(ev.start)) ? '' : fmtDay(new Date(alt.start), lang) + ' '}${fmtTime(alt.start, lang)}` : '';
   const note = alt
@@ -241,15 +279,15 @@ function EventCard({ lang, chart, ev, all, onMove, onDelete }: { lang: Lang; cha
         <div className="time">{ev.allDay ? (lang === 'zh' ? '全天' : 'All day') : fmtTime(ev.start, lang)}</div>
         <div className="grow">
           <div className="ev-title">{ev.title}</div>
-          {top && <div className="muted small">{lang === 'zh' ? top.zh : top.en}</div>}
+          {tops.length > 0 && <div className="muted small">{actLabel}{tops.map((x) => (lang === 'zh' ? x.zh : x.en)).join(' ')}</div>}
         </div>
         <VerdictTag v={r.verdict} lang={lang} />
       </div>
-      {r.verdict !== 'good' && !ev.allDay && (
+      {!ev.allDay && (alt || r.verdict === 'bad') && (
         <div className="suggest">
           {alt ? (
             <>
-              <p>{t.suggest} <b>{altLabel}</b> ({T[lang][alt.verdict]}, {alt.score})</p>
+              <p>{r.verdict === 'good' ? t.evenBetter : t.suggest} <b>{altLabel}</b> ({T[lang][alt.verdict]}, {alt.score})</p>
               {ev.source === 'manual' ? (
                 <button className="primary" onClick={() => onMove(alt.start, alt.end)}>{t.moveTo} {altLabel}</button>
               ) : (
@@ -269,7 +307,7 @@ function EventCard({ lang, chart, ev, all, onMove, onDelete }: { lang: Lang; cha
       {why && (
         <ul className="reasons">
           {r.reasons.map((x, i) => <li key={i}><span className={x.delta >= 0 ? 'plus' : 'minus'}>{x.delta >= 0 ? '+' : ''}{x.delta}</span> {lang === 'zh' ? x.zh : x.en}</li>)}
-          <li className="muted">{lang === 'zh' ? `综合 ${r.score} 分 · 日 ${r.dayGanZhi} · 时 ${r.hourGanZhi}` : `Score ${r.score} · day ${r.dayGanZhi} · hour ${r.hourGanZhi}`}</li>
+          <li className="muted">{lang === 'zh' ? `综合 ${r.score} 分 · 日 ${r.dayGanZhi} · 时 ${r.hourGanZhi}` : `Score ${r.score} · ${STEM[r.dayGanZhi[0]].pinyin}-${BRANCH[r.dayGanZhi[1]].pinyin} day · ${BRANCH[r.hourGanZhi[1]].animal} hour`}</li>
         </ul>
       )}
     </article>
@@ -287,22 +325,40 @@ function Ask({ lang, chart, events }: { lang: Lang; chart: Chart; events: CalEve
   async function send(question: string) {
     if (!question.trim() || busy) return;
     const history = msgs;
-    setMsgs([...history, { role: 'user', text: question }]);
+    setMsgs([...history, { role: 'user', text: question }, { role: 'assistant', text: '' }]);
     setQ('');
     setBusy(true);
-    let answer = '';
+    const put = (text: string) => setMsgs((m) => [...m.slice(0, -1), { role: 'assistant', text }]);
+    const fallback = (lead: string) => put(`${lead}\n\n${fallbackAnswer(chart, question, lang)}`);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 45000);
     try {
       const res = await fetch('/api/ask', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
+        method: 'POST', headers: { 'content-type': 'application/json' }, signal: ctrl.signal,
         body: JSON.stringify({ question, lang, history, context: buildContext(chart, events, question, lang) }),
       });
-      const j = await res.json().catch(() => ({}));
-      answer = j.answer || `${t.offline}\n\n${fallbackAnswer(chart, question, lang)}`;
+      if (res.status === 503) fallback(t.offline);
+      else if (res.status === 429) put(t.rateLimited);
+      else if (!res.ok || !res.body) fallback(t.aiError);
+      else {
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let text = '';
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          text += dec.decode(value, { stream: true });
+          if (text.includes('\u0000ERROR')) break;
+          put(text);
+        }
+        if (text.includes('\u0000ERROR') || !text.trim()) fallback(t.aiError);
+      }
     } catch {
-      answer = `${t.offline}\n\n${fallbackAnswer(chart, question, lang)}`;
+      fallback(t.aiError);
+    } finally {
+      clearTimeout(timer);
+      setBusy(false);
     }
-    setMsgs((m) => [...m, { role: 'assistant', text: answer }]);
-    setBusy(false);
   }
 
   return (
@@ -317,8 +373,8 @@ function Ask({ lang, chart, events }: { lang: Lang; chart: Chart; events: CalEve
         </div>
       )}
       <div className="msgs">
-        {msgs.map((m, i) => <div key={i} className={`bubble ${m.role}`}>{m.text}</div>)}
-        {busy && <div className="bubble assistant muted">{t.thinking}</div>}
+        {msgs.map((m, i) => (m.text ? <div key={i} className={`bubble ${m.role}`}>{m.text}</div> : null))}
+        {busy && !msgs.at(-1)?.text && <div className="bubble assistant muted" aria-live="polite"><span className="dots">{t.thinking}</span></div>}
       </div>
       <form className="composer" onSubmit={(e) => { e.preventDefault(); send(q); }}>
         <label className="sr" htmlFor="q">{t.askTitle}</label>
@@ -340,8 +396,11 @@ function ChartView({ lang, chart, profile, onEdit }: { lang: Lang; chart: Chart;
   return (
     <div className="stack">
       <div>
-        <div className="muted small">{profile.name || ''} {profile.place ? `· ${profile.place}` : ''}</div>
+        <div className="muted small">{[profile.name, profile.place].filter(Boolean).join(' · ')}</div>
         <h1>{t.myChart}</h1>
+        <p className="muted small">
+          {`${profile.birth.year}-${pad(profile.birth.month)}-${pad(profile.birth.day)}`} {profile.birth.hourUnknown ? t.timeUnknownShort : `${pad(profile.birth.hour)}:${pad(profile.birth.minute)}`} · {t.clockTimeNote}
+        </p>
       </div>
       <div className="pillars">
         {chart.pillars.map((p) => {
@@ -351,6 +410,7 @@ function ChartView({ lang, chart, profile, onEdit }: { lang: Lang; chart: Chart;
               <div className="small">{t[p.label]}</div>
               <div className="gz">{hidden ? '?' : p.stem}<br />{hidden ? '?' : p.branch}</div>
               <div className="tiny">{hidden ? '' : `${STEM[p.stem].pinyin} ${BRANCH[p.branch].pinyin}`}</div>
+              {!hidden && <div className="tiny" title={t.hiddenStems}>{t.hiddenShort} {HIDDEN[p.branch].join('')}</div>}
             </div>
           );
         })}
@@ -359,10 +419,12 @@ function ChartView({ lang, chart, profile, onEdit }: { lang: Lang; chart: Chart;
         <p><b>{t.dayMaster}:</b> {chart.dayMaster} {STEM[chart.dayMaster].pinyin} {el(chart.dayMasterElement)} · {chart.strong ? t.strong : t.weak}</p>
         <p><b>{t.favorable}:</b> {chart.favorable.map(el).join(lang === 'zh' ? '、' : ', ')}</p>
         <p><b>{t.unfavorable}:</b> {chart.unfavorable.map(el).join(lang === 'zh' ? '、' : ', ')}</p>
+        <p className="small muted">{chart.strong ? t.strongExplain : t.weakExplain}</p>
         <p><b>{t.zodiac}:</b> {lang === 'zh' ? BRANCH[chart.yearBranch].zh : BRANCH[chart.yearBranch].animal} · <b>{t.sun}:</b> {lang === 'zh' ? chart.sunSign.zh : chart.sunSign.en}</p>
       </section>
       <section className="card">
         <div className="label">{t.elementBalance}</div>
+        <p className="small muted">{t.balanceExplain}</p>
         {(Object.keys(chart.counts) as Element[]).map((e) => (
           <div key={e} className="bar-row">
             <span className="bar-label">{el(e)}</span>
@@ -370,6 +432,10 @@ function ChartView({ lang, chart, profile, onEdit }: { lang: Lang; chart: Chart;
             <span className="small">{chart.counts[e]}</span>
           </div>
         ))}
+      </section>
+      <section className="card">
+        <div className="label">{t.aboutPillars}</div>
+        <ul className="reasons">{t.pillarsExplain.map((x) => <li key={x}>{x}</li>)}</ul>
       </section>
       <p className="muted small">{t.simplified}</p>
       <button className="ghost" onClick={() => setEditing(true)}>{t.editBirth}</button>
@@ -416,9 +482,11 @@ function Settings({ lang, setLang, ics, setIcs, onReset }: { lang: Lang; setLang
       <section className="card">
         <div className="label">{t.forwarding}</div>
         <p className="muted small">{t.forwardingSoon}</p>
+        <a className="ghost btnlink" href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('FateCal email forwarding waitlist')}&body=${encodeURIComponent(lang === 'zh' ? '请把我加入邮件转发候补名单。' : 'Please add me to the email forwarding waitlist.')}`}>{t.joinWaitlist}</a>
       </section>
       <p className="muted small">{t.privacy}</p>
       <button className="ghost danger" onClick={onReset}>{t.reset}</button>
+      <Footer lang={lang} />
     </div>
   );
 }
