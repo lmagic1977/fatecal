@@ -133,3 +133,5 @@ a { color: var(--red-ink); }
   .onboard .form { margin: 0 40px 16px; }
   .pad { padding: 0 40px 24px; }
 }
+.addr { font-family: ui-monospace, Menlo, monospace; font-size: 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; overflow-wrap: anywhere; }
+.mail { border-top: 1px solid var(--line); padding-top: 10px; }

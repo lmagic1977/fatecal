@@ -2,18 +2,19 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  BirthInput, CalEvent, Chart, computeChart, readEvent, scoreDay, dayActivities, activityName, STEM, BRANCH, ELEMENT_NAME, Element, HIDDEN,
+  BirthInput, CalEvent, Category, Chart, computeChart, readEvent, scoreDay, dayActivities, activityName, STEM, BRANCH, ELEMENT_NAME, Element, HIDDEN,
 } from '@/lib/engine';
 import { T, Lang, almanac } from '@/lib/i18n';
 import { buildContext, fallbackAnswer, fmtDay, fmtHour } from '@/lib/bot';
 import Footer from '@/components/Footer';
 import { CONTACT_EMAIL } from '@/lib/site';
+import type { MailItem } from '@/lib/mail';
 
 interface Profile { name: string; birth: BirthInput; place: string }
 type Tab = 'today' | 'ask' | 'chart' | 'settings';
 interface Msg { role: 'user' | 'assistant'; text: string }
 
-const K = { profile: 'fatecal.profile', events: 'fatecal.events', ics: 'fatecal.ics', lang: 'fatecal.lang' };
+const K = { profile: 'fatecal.profile', events: 'fatecal.events', ics: 'fatecal.ics', lang: 'fatecal.lang', mailKey: 'fatecal.mailkey', mailAddr: 'fatecal.mailaddr', mail: 'fatecal.mail' };
 
 function load<T>(k: string, fallback: T): T {
   try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
@@ -26,6 +27,17 @@ const fmtTime = (iso: string, lang: Lang) => new Date(iso).toLocaleTimeString(tL
 const pad = (n: number) => String(n).padStart(2, '0');
 const isoLocalDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
+// "YYYY-MM-DD" / "YYYY-MM-DDTHH:mm" are local wall times; anything with an offset is absolute.
+const parseMailTime = (v: string) => (/[zZ]|[+-]\d{2}:?\d{2}$/.test(v) ? new Date(v) : new Date(v.length === 10 ? `${v}T00:00` : v));
+const mailToEvent = (m: MailItem): CalEvent | null => {
+  if (!m.start || m.kind === 'verify') return null;
+  const s = parseMailTime(m.start);
+  if (isNaN(s.getTime())) return null;
+  const allDay = !!m.allDay || m.start.length === 10;
+  const e = m.end ? parseMailTime(m.end) : new Date(s.getTime() + (allDay ? 24 : 1) * 3600e3);
+  return { id: `mail-${m.id}`, title: m.title, start: s.toISOString(), end: (isNaN(e.getTime()) ? new Date(s.getTime() + 3600e3) : e).toISOString(), allDay, source: 'email', from: m.from };
+};
+
 export default function App() {
   const [ready, setReady] = useState(false);
   const [lang, setLang] = useState<Lang>('en');
@@ -33,6 +45,9 @@ export default function App() {
   const [manual, setManual] = useState<CalEvent[]>([]);
   const [ics, setIcs] = useState<{ url: string; events: CalEvent[]; at?: string } | null>(null);
   const [tab, setTab] = useState<Tab>('today');
+  const [mail, setMail] = useState<MailItem[]>([]);
+  const [mailKey, setMailKey] = useState<string | null>(null);
+  const [mailAddr, setMailAddr] = useState<string | null>(null);
 
   useEffect(() => {
     const stored = load<Lang | null>(K.lang, null);
@@ -40,11 +55,39 @@ export default function App() {
     setProfile(load<Profile | null>(K.profile, null));
     setManual(load<CalEvent[]>(K.events, []));
     setIcs(load(K.ics, null));
+    setMail(load<MailItem[]>(K.mail, []));
+    setMailKey(load<string | null>(K.mailKey, null));
+    setMailAddr(load<string | null>(K.mailAddr, null));
     setReady(true);
   }, []);
   useEffect(() => { if (ready) save(K.lang, lang); }, [lang, ready]);
   useEffect(() => { if (ready) save(K.events, manual); }, [manual, ready]);
   useEffect(() => { if (ready) save(K.ics, ics); }, [ics, ready]);
+  useEffect(() => { if (ready) save(K.mail, mail.slice(-200)); }, [mail, ready]);
+
+  // Fetch forwarded mail: on start, then every minute while the app is open.
+  async function checkMail(key = mailKey, peek = false) {
+    if (!key) return 0;
+    const j = await fetch('/api/inbox', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key, peek }) })
+      .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (!j) return -1;
+    if (j.address) { setMailAddr(j.address); save(K.mailAddr, j.address); }
+    if (j.items?.length) setMail((m) => [...m, ...j.items.filter((x: MailItem) => !m.some((y) => y.id === x.id))]);
+    return j.items?.length ?? 0;
+  }
+  useEffect(() => {
+    if (!ready || !mailKey) return;
+    checkMail();
+    const id = setInterval(() => checkMail(), 60000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, mailKey]);
+  async function enableMail() {
+    const key = crypto.randomUUID();
+    save(K.mailKey, key);
+    setMailKey(key);
+    await checkMail(key, true);
+  }
 
   // refresh the calendar feed once per session
   useEffect(() => {
@@ -57,7 +100,7 @@ export default function App() {
   }, [ready]);
 
   const chart = useMemo(() => (profile ? computeChart(profile.birth) : null), [profile]);
-  const events = useMemo(() => [...manual, ...(ics?.events ?? [])].sort((a, b) => a.start.localeCompare(b.start)), [manual, ics]);
+  const events = useMemo(() => [...manual, ...(ics?.events ?? []), ...(mail.map(mailToEvent).filter(Boolean) as CalEvent[])].sort((a, b) => a.start.localeCompare(b.start)), [manual, ics, mail]);
   const t = T[lang];
 
   // Before local data loads (and on the server) show the onboarding screen, so the page has real content for search engines.
@@ -77,7 +120,8 @@ export default function App() {
         {tab === 'ask' && <Ask lang={lang} chart={chart} events={events} />}
         {tab === 'chart' && <ChartView lang={lang} chart={chart} profile={profile} onEdit={(p) => { setProfile(p); save(K.profile, p); }} />}
         {tab === 'settings' && (
-          <Settings lang={lang} setLang={setLang} ics={ics} setIcs={setIcs}
+          <Settings lang={lang} setLang={setLang} ics={ics} setIcs={setIcs} chart={chart}
+            mail={mail} mailAddr={mailAddr} onEnableMail={enableMail} onCheckMail={() => checkMail()} onClearMail={() => setMail([])}
             onReset={() => { if (confirm(t.resetConfirm)) { Object.values(K).forEach((k) => localStorage.removeItem(k)); location.reload(); } }} />
         )}
       </main>
@@ -445,7 +489,7 @@ function ChartView({ lang, chart, profile, onEdit }: { lang: Lang; chart: Chart;
 
 // ---------------- settings ----------------
 
-function Settings({ lang, setLang, ics, setIcs, onReset }: { lang: Lang; setLang: (l: Lang) => void; ics: { url: string; events: CalEvent[]; at?: string } | null; setIcs: (v: { url: string; events: CalEvent[]; at?: string } | null) => void; onReset: () => void }) {
+function Settings({ lang, setLang, ics, setIcs, onReset, chart, mail, mailAddr, onEnableMail, onCheckMail, onClearMail }: { lang: Lang; setLang: (l: Lang) => void; ics: { url: string; events: CalEvent[]; at?: string } | null; setIcs: (v: { url: string; events: CalEvent[]; at?: string } | null) => void; onReset: () => void; chart: Chart; mail: MailItem[]; mailAddr: string | null; onEnableMail: () => Promise<void>; onCheckMail: () => Promise<number>; onClearMail: () => void }) {
   const t = T[lang];
   const [url, setUrl] = useState(ics?.url ?? '');
   const [state, setState] = useState<'idle' | 'busy' | 'error'>('idle');
@@ -479,15 +523,73 @@ function Settings({ lang, setLang, ics, setIcs, onReset }: { lang: Lang; setLang
         )}
         {state === 'error' && <p className="danger small">{t.icsError}</p>}
       </section>
-      <section className="card">
-        <div className="label">{t.forwarding}</div>
-        <p className="muted small">{t.forwardingSoon}</p>
-        <a className="ghost btnlink" href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('FateCal email forwarding waitlist')}&body=${encodeURIComponent(lang === 'zh' ? '请把我加入邮件转发候补名单。' : 'Please add me to the email forwarding waitlist.')}`}>{t.joinWaitlist}</a>
-      </section>
+      <MailSection lang={lang} chart={chart} mail={mail} mailAddr={mailAddr} onEnable={onEnableMail} onCheck={onCheckMail} onClear={onClearMail} />
       <p className="muted small">{t.privacy}</p>
       <button className="ghost danger" onClick={onReset}>{t.reset}</button>
       <Footer lang={lang} />
     </div>
+  );
+}
+
+// ---------------- email forwarding ----------------
+
+const KIND_CAT: Record<string, Category> = { meeting: 'meeting', order: 'money', travel: 'travel', bill: 'money', contract: 'signing', other: 'general' };
+
+function MailSection({ lang, chart, mail, mailAddr, onEnable, onCheck, onClear }: { lang: Lang; chart: Chart; mail: MailItem[]; mailAddr: string | null; onEnable: () => Promise<void>; onCheck: () => Promise<number>; onClear: () => void }) {
+  const t = T[lang];
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  const [copied, setCopied] = useState(false);
+  const verify = [...mail].reverse().find((m) => m.kind === 'verify');
+  const recent = mail.filter((m) => m.kind !== 'verify').slice(-8).reverse();
+  return (
+    <section className="card form">
+      <div className="label">{t.forwarding}</div>
+      {!mailAddr ? (
+        <>
+          <p className="muted small">{t.forwardingIntro}</p>
+          <button className="primary" disabled={busy} onClick={async () => { setBusy(true); await onEnable(); setBusy(false); }}>{t.getAddress}</button>
+        </>
+      ) : (
+        <>
+          <p className="small">{t.yourAddress}</p>
+          <div className="row gap">
+            <code className="addr grow">{mailAddr}</code>
+            <button className="ghost" onClick={() => { navigator.clipboard?.writeText(mailAddr); setCopied(true); }}>{copied ? t.copied : t.copy}</button>
+          </div>
+          <details className="explain"><summary>{t.howForward}</summary><ul className="reasons">{t.forwardSteps.map((x) => <li key={x}>{x}</li>)}</ul></details>
+          {verify && (
+            <div className="suggest">
+              <p className="small"><b>{t.gmailConfirm}</b> {verify.verifyCode ? `${t.code}: ${verify.verifyCode}` : ''}</p>
+              {verify.verifyLink && <a className="primary btnlink" href={verify.verifyLink} target="_blank" rel="noreferrer">{t.openConfirm}</a>}
+            </div>
+          )}
+          <div className="row gap">
+            <button className="ghost grow" disabled={busy} onClick={async () => { setBusy(true); const n = await onCheck(); setNote(n < 0 ? t.mailError : n ? `${n} ${t.newMail}` : t.noNewMail); setBusy(false); }}>{busy ? t.syncing : t.checkMail}</button>
+            {recent.length > 0 && <button className="link" onClick={onClear}>{t.clearMail}</button>}
+          </div>
+          {note && <p className="small muted" aria-live="polite">{note}</p>}
+          {recent.map((m) => {
+            const ev = mailToEvent(m);
+            const r = ev ? readEvent(chart, { ...ev, title: `${m.title}` }, []) : null;
+            const cat = KIND_CAT[m.kind] ?? 'general';
+            return (
+              <div key={m.id} className="mail">
+                <div className="row gap top-align">
+                  <div className="grow">
+                    <div className="ev-title">{m.title}</div>
+                    <div className="muted small">{m.from}{m.amount ? ` · ${m.amount}` : ''}{ev ? ` · ${fmtDay(new Date(ev.start), lang)}${ev.allDay ? '' : ' ' + fmtTime(ev.start, lang)}` : ''}</div>
+                    {r && <div className="small">{cat !== 'general' ? `${activityName(cat, lang)}: ` : ''}{r.reasons.filter((x) => x.scope !== 'hour' || !ev?.allDay).slice(0, 1).map((x) => (lang === 'zh' ? x.zh : x.en))}</div>}
+                    {!r && m.summary && <div className="small muted">{m.summary}</div>}
+                  </div>
+                  {r && <VerdictTag v={r.verdict} lang={lang} />}
+                </div>
+              </div>
+            );
+          })}
+        </>
+      )}
+    </section>
   );
 }
 

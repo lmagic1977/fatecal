@@ -320,7 +320,7 @@ export function dayActivities(chart: Chart, date: Date) {
   return { good, avoid };
 }
 
-export interface CalEvent { id: string; title: string; start: string; end: string; allDay?: boolean; source: 'manual' | 'calendar' }
+export interface CalEvent { id: string; title: string; start: string; end: string; allDay?: boolean; source: 'manual' | 'calendar' | 'email'; from?: string }
 
 export interface EventReading extends MomentScore { category: Category; alternatives: { start: string; end: string; score: number; verdict: Verdict }[] }
 
