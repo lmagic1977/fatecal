@@ -10,17 +10,21 @@ const pathFor = (uid: string) => `users/${createHash('sha256').update(uid).diges
 
 async function who() {
   const s: any = await auth();
-  return s?.uid ? { uid: s.uid as string, name: s.user?.name as string | undefined, email: s.user?.email as string | undefined, image: s.user?.image as string | undefined } : null;
+  return s?.uid ? { uid: s.uid as string, alt: s.alt as string | undefined, name: s.user?.name as string | undefined, email: s.user?.email as string | undefined, image: s.user?.image as string | undefined } : null;
 }
 
 export async function GET() {
   const u = await who();
   if (!u) return NextResponse.json({ user: null });
-  let data = null;
-  try {
-    const r = await get(pathFor(u.uid), { access: 'private', useCache: false });
-    if (r && 'stream' in r && r.stream) data = JSON.parse(await new Response(r.stream).text());
-  } catch { /* none yet */ }
+  const read = async (id: string) => {
+    try {
+      const r = await get(pathFor(id), { access: 'private', useCache: false });
+      if (r && 'stream' in r && r.stream) return JSON.parse(await new Response(r.stream).text());
+    } catch { /* none yet */ }
+    return null;
+  };
+  // fall back to data saved under the older provider-based id (the next save moves it to the new id)
+  const data = (await read(u.uid)) ?? (u.alt && u.alt !== u.uid ? await read(u.alt) : null);
   return NextResponse.json({ user: { name: u.name, email: u.email, image: u.image }, data });
 }
 

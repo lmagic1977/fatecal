@@ -21,7 +21,7 @@ interface Seed { q: string; photo?: Pic }
 const birthFsYear = (b: BirthInput) => liChunYear(new Date(b.year, b.month - 1, b.day, b.hourUnknown ? 12 : b.hour, b.hourUnknown ? 0 : b.minute));
 interface Msg { role: 'user' | 'assistant'; text: string; image?: string }
 
-const K = { profile: 'fatecal.profile', events: 'fatecal.events', ics: 'fatecal.ics', lang: 'fatecal.lang', mailKey: 'fatecal.mailkey', mailAddr: 'fatecal.mailaddr', mail: 'fatecal.mail' };
+const K = { owner: 'fatecal.owner', profile: 'fatecal.profile', events: 'fatecal.events', ics: 'fatecal.ics', lang: 'fatecal.lang', mailKey: 'fatecal.mailkey', mailAddr: 'fatecal.mailaddr', mail: 'fatecal.mail' };
 
 function load<T>(k: string, fallback: T): T {
   try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
@@ -58,6 +58,7 @@ export default function App() {
   const [account, setAccount] = useState<Account | null>(null);
   const [providers, setProviders] = useState<string[]>([]);
   const [seed, setSeed] = useState<Seed | null>(null);
+  const [authed, setAuthed] = useState<'checking' | 'out' | 'in'>('checking');
   const synced = useRef(false);
 
   useEffect(() => {
@@ -81,8 +82,16 @@ export default function App() {
     if (!ready) return;
     fetch('/api/auth/providers-list').then((r) => r.json()).then((j) => setProviders(j.providers ?? [])).catch(() => {});
     fetch('/api/sync').then((r) => (r.ok ? r.json() : null)).then((j) => {
-      if (!j?.user) { synced.current = true; return; }
+      if (!j?.user) { synced.current = true; setAuthed('out'); return; }
       setAccount(j.user);
+      // data left on this device by a different account is not shown to this one
+      const me = j.user.email || j.user.name || 'me';
+      const owner = load<string | null>(K.owner, null);
+      if (owner && owner !== me) {
+        [K.profile, K.events, K.ics, K.mailKey, K.mailAddr, K.mail].forEach((k) => localStorage.removeItem(k));
+        setProfile(null); setManual([]); setIcs(null); setMail([]); setMailKey(null); setMailAddr(null);
+      }
+      save(K.owner, me);
       const d = j.data;
       if (d?.profile) {
         setProfile(d.profile); save(K.profile, d.profile);
@@ -92,7 +101,8 @@ export default function App() {
         if (d.mailKey && !mailKey) { save(K.mailKey, d.mailKey); setMailKey(d.mailKey); }
       }
       synced.current = true;
-    }).catch(() => { synced.current = true; });
+      setAuthed('in');
+    }).catch(() => { synced.current = true; setAuthed('out'); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
   useEffect(() => {
@@ -142,9 +152,12 @@ export default function App() {
   const t = T[lang];
 
   // Before local data loads (and on the server) show the onboarding screen, so the page has real content for search engines.
-  if (!ready) return <div className="preload"><Onboarding lang={lang} setLang={setLang} initial={null} onDone={() => {}} /></div>;
+  // Everyone signs up first (Google, Facebook, email or phone), then fills in their birth details.
+  if (!ready) return <div className="preload"><Landing lang={lang} setLang={setLang} providers={[]} /></div>;
+  if (authed === 'checking') return <div className="shell onboard"><div className="hero"><div className="brand big">FateCal</div><p className="muted" aria-live="polite">{t.loading}</p></div></div>;
+  if (authed === 'out') return <Landing lang={lang} setLang={setLang} providers={providers} />;
   if (!profile || !chart) {
-    return <Onboarding lang={lang} setLang={setLang} initial={null} account={account} providers={providers} onDone={(p) => { setProfile(p); save(K.profile, p); }} />;
+    return <Onboarding lang={lang} setLang={setLang} initial={null} account={account} onDone={(p) => { setProfile(p); save(K.profile, p); }} />;
   }
 
   return (
@@ -178,7 +191,7 @@ export default function App() {
 
 // ---------------- onboarding ----------------
 
-function Onboarding({ lang, setLang, initial, onDone, onCancel, account = null, providers = [] }: { lang: Lang; setLang: (l: Lang) => void; initial: Profile | null; onDone: (p: Profile) => void; onCancel?: () => void; account?: Account | null; providers?: string[] }) {
+function Onboarding({ lang, setLang, initial, onDone, onCancel, account = null }: { lang: Lang; setLang: (l: Lang) => void; initial: Profile | null; onDone: (p: Profile) => void; onCancel?: () => void; account?: Account | null }) {
   const t = T[lang];
   const b = initial?.birth;
   const [name, setName] = useState(initial?.name ?? '');
@@ -191,36 +204,17 @@ function Onboarding({ lang, setLang, initial, onDone, onCancel, account = null, 
 
   return (
     <div className="shell onboard">
-      <div className="hero">
-        <div className="brand big">FateCal</div>
-        <p className="lead">{t.tagline}</p>
-        {!initial && (
-          <>
-            <div className="card sample" aria-label={t.sampleLabel}>
-              <div className="tiny">{t.sampleLabel}</div>
-              <div className="row gap top-align">
-                <div className="time">2:00 PM</div>
-                <div className="grow">
-                  <div className="ev-title">{t.sampleTitle}</div>
-                  <div className="muted small">{t.sampleWhy}</div>
-                </div>
-                <span className="tag bad">{t.bad}</span>
-              </div>
-              <div className="suggest small">{t.sampleSuggest}</div>
-            </div>
-            <ul className="points">{t.points.map((x) => <li key={x}>{x}</li>)}</ul>
-            <details className="explain">
-              <summary>{t.whatIsBazi}</summary>
-              <p className="small">{t.baziExplain}</p>
-            </details>
-          </>
-        )}
-        <div className="seg">
-          <button className={lang === 'en' ? 'on' : ''} onClick={() => setLang('en')}>English</button>
-          <button className={lang === 'zh' ? 'on' : ''} onClick={() => setLang('zh')}>中文</button>
+      {!initial && (
+        <div className="hero">
+          <div className="brand big">FateCal</div>
+          <h1>{t.welcome}{account?.name && !account.name.includes('@') && !account.name.includes('*') ? `, ${account.name}` : ''}</h1>
+          <p className="muted">{t.profileIntro}</p>
+          <div className="seg">
+            <button className={lang === 'en' ? 'on' : ''} onClick={() => setLang('en')}>English</button>
+            <button className={lang === 'zh' ? 'on' : ''} onClick={() => setLang('zh')}>中文</button>
+          </div>
         </div>
-      </div>
-      {!initial && <div className="pad0"><AccountCard lang={lang} account={account} providers={providers} compact /></div>}
+      )}
       <form className="card form" onSubmit={(e) => {
         e.preventDefault();
         if (!valid) return;
@@ -248,6 +242,134 @@ function Onboarding({ lang, setLang, initial, onDone, onCancel, account = null, 
       {!initial && <Footer lang={lang} />}
     </div>
   );
+}
+
+// ---------------- landing and sign-up ----------------
+
+function Landing({ lang, setLang, providers }: { lang: Lang; setLang: (l: Lang) => void; providers: string[] }) {
+  const t = T[lang];
+  return (
+    <div className="shell onboard">
+      <div className="hero">
+        <div className="brand big">FateCal</div>
+        <p className="lead">{t.tagline}</p>
+        <div className="card sample" aria-label={t.sampleLabel}>
+          <div className="tiny">{t.sampleLabel}</div>
+          <div className="row gap top-align">
+            <div className="time">2:00 PM</div>
+            <div className="grow">
+              <div className="ev-title">{t.sampleTitle}</div>
+              <div className="muted small">{t.sampleWhy}</div>
+            </div>
+            <span className="tag bad">{t.bad}</span>
+          </div>
+          <div className="suggest small">{t.sampleSuggest}</div>
+        </div>
+        <ul className="points">{t.points.map((x) => <li key={x}>{x}</li>)}</ul>
+        <details className="explain">
+          <summary>{t.whatIsBazi}</summary>
+          <p className="small">{t.baziExplain}</p>
+        </details>
+        <div className="seg">
+          <button className={lang === 'en' ? 'on' : ''} onClick={() => setLang('en')}>English</button>
+          <button className={lang === 'zh' ? 'on' : ''} onClick={() => setLang('zh')}>中文</button>
+        </div>
+      </div>
+      <SignUp lang={lang} providers={providers} />
+      <p className="muted small pad">{t.simplified}</p>
+      <Footer lang={lang} />
+    </div>
+  );
+}
+
+const DIAL = ['+1', '+86', '+852', '+853', '+886', '+65', '+60', '+81', '+82', '+44', '+61', '+64', '+33', '+49', '+52'];
+
+function SignUp({ lang, providers }: { lang: Lang; providers: string[] }) {
+  const t = T[lang];
+  const [mode, setMode] = useState<'pick' | 'email' | 'phone'>('pick');
+  const [step, setStep] = useState<'enter' | 'code'>('enter');
+  const [email, setEmail] = useState('');
+  const [dial, setDial] = useState(lang === 'zh' ? '+86' : '+1');
+  const [num, setNum] = useState('');
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const to = mode === 'email' ? email.trim() : `${dial}${num.replace(/[^\d]/g, '').replace(/^0+/, '')}`;
+  const social = providers.filter((p) => p === 'google' || p === 'facebook');
+
+  async function send() {
+    setErr('');
+    if (mode === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) { setErr(t.badEmail); return; }
+    if (mode === 'phone' && !/^\+[1-9]\d{6,14}$/.test(to)) { setErr(t.badPhone); return; }
+    setBusy(true);
+    const res = await fetch('/api/auth/otp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ channel: mode, to, lang }) }).catch(() => null);
+    setBusy(false);
+    if (res?.ok) { setStep('code'); setCode(''); return; }
+    if (res?.status === 429) { setErr(t.waitResend); if (step === 'enter') setStep('code'); return; }
+    setErr(res?.status === 400 ? (mode === 'email' ? t.badEmail : t.badPhone) : t.sendFailed);
+  }
+  async function verify() {
+    setErr('');
+    setBusy(true);
+    const r = await signIn('otp', { channel: mode, to, code: code.trim(), redirect: false }).catch(() => null);
+    if (!r || r.error) { setBusy(false); setErr(t.badCode); return; }
+    location.href = '/';
+  }
+
+  return (
+    <section className="card stack" aria-labelledby="signup-h">
+      <div>
+        <h2 id="signup-h">{t.signUp}</h2>
+        <p className="small muted">{t.signUpIntro}</p>
+      </div>
+      {mode === 'pick' && (
+        <>
+          {social.map((p) => (
+            <button key={p} className="social" onClick={() => signIn(p, { redirectTo: '/' })}>
+              <ProviderIcon id={p} /> {p === 'google' ? t.withGoogle : t.withFacebook}
+            </button>
+          ))}
+          {providers.includes('email') && <button className="social" onClick={() => { setMode('email'); setStep('enter'); setErr(''); }}><MailIcon /> {t.withEmail}</button>}
+          {providers.includes('phone') && <button className="social" onClick={() => { setMode('phone'); setStep('enter'); setErr(''); }}><PhoneIcon /> {t.withPhone}</button>}
+        </>
+      )}
+      {mode !== 'pick' && step === 'enter' && (
+        <form className="form flat" onSubmit={(e) => { e.preventDefault(); send(); }}>
+          {mode === 'email' ? (
+            <label>{t.emailLabel}<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" inputMode="email" required autoFocus /></label>
+          ) : (
+            <div className="row gap">
+              <label className="dial">{t.country}<select value={dial} onChange={(e) => setDial(e.target.value)}>{DIAL.map((d) => <option key={d} value={d}>{d}</option>)}</select></label>
+              <label className="grow">{t.phoneLabel}<input type="tel" value={num} onChange={(e) => setNum(e.target.value)} autoComplete="tel-national" inputMode="tel" required autoFocus /></label>
+            </div>
+          )}
+          {mode === 'phone' && <p className="tiny muted">{t.smsNote}</p>}
+          <button className="primary" disabled={busy}>{busy ? t.sending : t.sendCode}</button>
+          <button type="button" className="ghost" onClick={() => { setMode('pick'); setErr(''); }}>{t.back}</button>
+        </form>
+      )}
+      {mode !== 'pick' && step === 'code' && (
+        <form className="form flat" onSubmit={(e) => { e.preventDefault(); verify(); }}>
+          <p className="small">{t.codeSentTo} <b>{to}</b></p>
+          <label>{t.codeLabel}<input value={code} onChange={(e) => setCode(e.target.value.replace(/[^\d]/g, '').slice(0, 8))} inputMode="numeric" autoComplete="one-time-code" required autoFocus /></label>
+          <button className="primary" disabled={busy || code.length < 4}>{busy ? t.verifying : t.verify}</button>
+          <div className="row gap">
+            <button type="button" className="link" disabled={busy} onClick={send}>{t.resend}</button>
+            <button type="button" className="link" onClick={() => { setStep('enter'); setErr(''); }}>{t.changeTo}</button>
+          </div>
+        </form>
+      )}
+      {err && <p className="danger small" role="alert">{err}</p>}
+      <p className="tiny muted">{t.agree} <a href="/terms">{lang === 'zh' ? '服务条款' : 'Terms'}</a> {t.and} <a href="/privacy">{lang === 'zh' ? '隐私政策' : 'Privacy Policy'}</a>.</p>
+    </section>
+  );
+}
+
+function MailIcon() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="M3.5 7l8.5 6 8.5-6" /></svg>;
+}
+function PhoneIcon() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" /><path d="M10.5 18h3" /></svg>;
 }
 
 // ---------------- today ----------------
@@ -889,7 +1011,7 @@ function AccountCard({ lang, account, providers, compact = false }: { lang: Lang
           <div className="ev-title">{account.name || account.email}</div>
           <div className="small muted">{t.signedInNote}</div>
         </div>
-        {!compact && <button className="ghost" onClick={() => signOut({ redirectTo: '/' })}>{t.signOut}</button>}
+        {!compact && <button className="ghost" onClick={() => { Object.values(K).forEach((k) => localStorage.removeItem(k)); signOut({ redirectTo: '/' }); }}>{t.signOut}</button>}
       </section>
     );
   }
