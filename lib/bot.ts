@@ -1,5 +1,6 @@
 import { Chart, CalEvent, scoreDay, scoreMoment, readEvent, categorize, Category, STEM, BRANCH, ELEMENT_NAME } from './engine';
 import { Lang, T, almanac } from './i18n';
+import { fengshuiContext, Sex } from './fengshui';
 
 const dayKey = (d: Date) => d.toDateString();
 const fmtDay = (d: Date, lang: Lang) => d.toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -48,7 +49,7 @@ export function targetOffsets(question: string, now = new Date()): number[] {
 // Everything the AI may use: the chart; a detailed hour-by-hour reading for the next three days and
 // any day the question names; a compact 60-day calendar (each day's verdict and its best slot for the
 // activity in question, extended to cover any named date); and the person's events with their readings.
-export function buildContext(chart: Chart, events: CalEvent[], question: string, lang: Lang) {
+export function buildContext(chart: Chart, events: CalEvent[], question: string, lang: Lang, fs?: { birthYear: number; sex?: Sex }) {
   const category: Category = categorize(question);
   const now = new Date();
   const tr = (r: { en: string; zh: string }) => (lang === 'zh' ? r.zh : r.en);
@@ -104,6 +105,7 @@ export function buildContext(chart: Chart, events: CalEvent[], question: string,
       zodiac: BRANCH[chart.yearBranch].animal, sunSign: chart.sunSign.en, birthHourKnown: !chart.hourUnknown,
     },
     days, calendar, upcoming,
+    fengShui: fs ? fengshuiContext(fs.birthYear, fs.sex, chart.favorable, now) : undefined,
   };
 }
 

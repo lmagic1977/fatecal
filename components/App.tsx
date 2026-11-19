@@ -11,9 +11,14 @@ import { signIn, signOut } from 'next-auth/react';
 import ShoppingResources from '@/components/ShoppingResources';
 import { CONTACT_EMAIL } from '@/lib/site';
 import type { MailItem } from '@/lib/mail';
+import { Sex, Dir, DIRS, DIR_NAME, DIR_ELEMENT, STAR8, FLY, kuaOf, annualStars, liChunYear, yearGanZhi, readHome, dirFromDegrees } from '@/lib/fengshui';
 
-interface Profile { name: string; birth: BirthInput; place: string }
-type Tab = 'today' | 'ask' | 'chart' | 'settings';
+interface Profile { name: string; birth: BirthInput; place: string; sex?: Sex }
+type Tab = 'today' | 'ask' | 'home' | 'chart' | 'settings';
+type Pic = { media_type: string; data: string; preview: string };
+interface Seed { q: string; photo?: Pic }
+// the Li Chun year of birth, which feng shui uses (births before about Feb 4 count as the previous year)
+const birthFsYear = (b: BirthInput) => liChunYear(new Date(b.year, b.month - 1, b.day, b.hourUnknown ? 12 : b.hour, b.hourUnknown ? 0 : b.minute));
 interface Msg { role: 'user' | 'assistant'; text: string; image?: string }
 
 const K = { profile: 'fatecal.profile', events: 'fatecal.events', ics: 'fatecal.ics', lang: 'fatecal.lang', mailKey: 'fatecal.mailkey', mailAddr: 'fatecal.mailaddr', mail: 'fatecal.mail' };
@@ -52,6 +57,7 @@ export default function App() {
   const [mailAddr, setMailAddr] = useState<string | null>(null);
   const [account, setAccount] = useState<Account | null>(null);
   const [providers, setProviders] = useState<string[]>([]);
+  const [seed, setSeed] = useState<Seed | null>(null);
   const synced = useRef(false);
 
   useEffect(() => {
@@ -149,7 +155,8 @@ export default function App() {
       </header>
       <main className="main">
         {tab === 'today' && <Today lang={lang} chart={chart} events={events} manual={manual} setManual={setManual} />}
-        {tab === 'ask' && <Ask lang={lang} chart={chart} events={events} />}
+        {tab === 'ask' && <Ask lang={lang} chart={chart} events={events} profile={profile} seed={seed} clearSeed={() => setSeed(null)} />}
+        {tab === 'home' && <FengShui lang={lang} chart={chart} profile={profile} setSex={(sx) => { const p = { ...profile, sex: sx }; setProfile(p); save(K.profile, p); }} ask={(sd) => { setSeed(sd); setTab('ask'); }} />}
         {tab === 'chart' && <ChartView lang={lang} chart={chart} profile={profile} onEdit={(p) => { setProfile(p); save(K.profile, p); }} />}
         {tab === 'settings' && (
           <Settings lang={lang} setLang={setLang} ics={ics} setIcs={setIcs} chart={chart} account={account} providers={providers}
@@ -158,7 +165,7 @@ export default function App() {
         )}
       </main>
       <nav className="tabs">
-        {(['today', 'ask', 'chart', 'settings'] as Tab[]).map((k) => (
+        {(['today', 'ask', 'home', 'chart', 'settings'] as Tab[]).map((k) => (
           <button key={k} className={tab === k ? 'tab on' : 'tab'} onClick={() => setTab(k)} aria-current={tab === k ? 'page' : undefined} aria-label={t[k]}>
             <Icon name={k} />
             <span>{t[k]}</span>
@@ -179,6 +186,7 @@ function Onboarding({ lang, setLang, initial, onDone, onCancel, account = null, 
   const [time, setTime] = useState(b && !b.hourUnknown ? `${pad(b.hour)}:${pad(b.minute)}` : '');
   const [unknown, setUnknown] = useState(!!b?.hourUnknown);
   const [place, setPlace] = useState(initial?.place ?? '');
+  const [sex, setSex] = useState<Sex | undefined>(initial?.sex);
   const valid = /^\d{4}-\d{2}-\d{2}$/.test(date) && (unknown || /^\d{2}:\d{2}$/.test(time));
 
   return (
@@ -218,12 +226,19 @@ function Onboarding({ lang, setLang, initial, onDone, onCancel, account = null, 
         if (!valid) return;
         const [y, m, d] = date.split('-').map(Number);
         const [hh, mm] = unknown ? [12, 0] : time.split(':').map(Number);
-        onDone({ name: name.trim(), place: place.trim(), birth: { year: y, month: m, day: d, hour: hh, minute: mm, hourUnknown: unknown } });
+        onDone({ name: name.trim(), place: place.trim(), sex, birth: { year: y, month: m, day: d, hour: hh, minute: mm, hourUnknown: unknown } });
       }}>
         <label>{t.name}<input value={name} onChange={(e) => setName(e.target.value)} autoComplete="given-name" /></label>
         <label>{t.birthDate}<input type="date" required value={date} min="1900-01-01" max="2100-12-31" onChange={(e) => setDate(e.target.value)} /></label>
         <label>{t.birthTime}<input type="time" value={time} disabled={unknown} onChange={(e) => setTime(e.target.value)} /></label>
         <label className="check"><input type="checkbox" checked={unknown} onChange={(e) => setUnknown(e.target.checked)} />{t.timeUnknown}</label>
+        <div className="field">
+          <span>{t.fs.sexLabel}</span>
+          <div className="seg">
+            <button type="button" className={sex === 'm' ? 'on' : ''} onClick={() => setSex('m')}>{t.fs.male}</button>
+            <button type="button" className={sex === 'f' ? 'on' : ''} onClick={() => setSex('f')}>{t.fs.female}</button>
+          </div>
+        </div>
         <label>{t.birthPlace}<input value={place} onChange={(e) => setPlace(e.target.value)} placeholder="Shanghai / Los Angeles" /></label>
         <p className="muted small">{t.birthPlaceHint} {t.privacyShort}</p>
         <button className="primary" disabled={!valid}>{initial ? t.save : t.continue}</button>
@@ -459,18 +474,26 @@ async function shrinkImage(file: File): Promise<{ media_type: string; data: stri
   }
 }
 
-function Ask({ lang, chart, events }: { lang: Lang; chart: Chart; events: CalEvent[] }) {
+function Ask({ lang, chart, events, profile, seed, clearSeed }: { lang: Lang; chart: Chart; events: CalEvent[]; profile: Profile; seed: Seed | null; clearSeed: () => void }) {
   const t = T[lang];
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
-  const [photo, setPhoto] = useState<{ media_type: string; data: string; preview: string } | null>(null);
+  const [photo, setPhoto] = useState<Pic | null>(null);
   const [listening, setListening] = useState(false);
   const [voiceOk, setVoiceOk] = useState(false);
   const recRef = useRef<any>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setVoiceOk(!!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)); }, []);
+  // a question handed over from another screen (e.g. a room photo from Feng Shui)
+  useEffect(() => {
+    if (!seed) return;
+    const s = seed;
+    clearSeed();
+    send(s.q, s.photo ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function toggleVoice() {
     if (listening) { recRef.current?.stop(); return; }
@@ -489,10 +512,10 @@ function Ask({ lang, chart, events }: { lang: Lang; chart: Chart; events: CalEve
     rec.start();
   }
 
-  async function send(question: string) {
-    if ((!question.trim() && !photo) || busy) return;
+  async function send(question: string, given?: Pic | null) {
+    const pic = given === undefined ? photo : given;
+    if ((!question.trim() && !pic) || busy) return;
     const history = msgs;
-    const pic = photo;
     setMsgs([...history, { role: 'user', text: question || (lang === 'zh' ? '帮我看看这张图' : 'What about this photo?'), image: pic?.preview }, { role: 'assistant', text: '' }]);
     setQ('');
     setPhoto(null);
@@ -506,7 +529,7 @@ function Ask({ lang, chart, events }: { lang: Lang; chart: Chart; events: CalEve
         method: 'POST', headers: { 'content-type': 'application/json' }, signal: ctrl.signal,
         body: JSON.stringify({
           question, lang, history: history.map(({ role, text }) => ({ role, text })),
-          context: buildContext(chart, events, question, lang),
+          context: buildContext(chart, events, question, lang, { birthYear: birthFsYear(profile.birth), sex: profile.sex }),
           image: pic ? { media_type: pic.media_type, data: pic.data } : undefined,
         }),
       });
@@ -579,6 +602,167 @@ function Ask({ lang, chart, events }: { lang: Lang; chart: Chart; events: CalEve
         <input id="q" value={q} onChange={(e) => setQ(e.target.value)} placeholder={listening ? t.listening : photo ? t.photoPlaceholder : t.askPlaceholder} maxLength={500} />
         <button className="primary" disabled={busy || (!q.trim() && !photo)}>{t.send}</button>
       </form>
+    </div>
+  );
+}
+
+// ---------------- feng shui ----------------
+
+const GRID: (Dir | 'C')[] = ['NW', 'N', 'NE', 'W', 'C', 'E', 'SW', 'S', 'SE'];
+const amazon = (q: string) => `https://www.amazon.com/s?k=${encodeURIComponent(q)}&tag=fatecal-20`;
+
+function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Chart; profile: Profile; setSex: (s: Sex) => void; ask: (s: Seed) => void }) {
+  const t = T[lang];
+  const f = t.fs;
+  const zh = lang === 'zh';
+  const dn = (d: Dir) => (zh ? DIR_NAME[d].zh : DIR_NAME[d].en);
+  const el = (e: Element) => (zh ? ELEMENT_NAME[e].zh : ELEMENT_NAME[e].en);
+  const kua = profile.sex ? kuaOf(birthFsYear(profile.birth), profile.sex) : null;
+  const thisYear = liChunYear(new Date());
+  const [yr, setYr] = useState(thisYear);
+  const stars = annualStars(yr);
+  const [cell, setCell] = useState<Dir | 'C' | null>(null);
+  const [facing, setFacing] = useState<Dir | null>(null);
+  const [compass, setCompass] = useState<'off' | 'on' | 'no'>('off');
+  const [heading, setHeading] = useState<number | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const gotHeading = useRef(false);
+  const home = facing ? readHome(facing, kua, chart.favorable, thisYear) : null;
+
+  useEffect(() => {
+    if (compass !== 'on') return;
+    const onOri = (e: any) => {
+      const h = typeof e.webkitCompassHeading === 'number' ? e.webkitCompassHeading : e.absolute && typeof e.alpha === 'number' ? 360 - e.alpha : null;
+      if (h === null) return;
+      gotHeading.current = true;
+      setHeading(Math.round(h));
+      setFacing(dirFromDegrees(h));
+    };
+    const ev = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
+    window.addEventListener(ev, onOri);
+    // no reading after a few seconds means this device has no usable compass
+    const none = setTimeout(() => { if (!gotHeading.current) setCompass('no'); }, 3000);
+    return () => { window.removeEventListener(ev, onOri); clearTimeout(none); };
+  }, [compass]);
+  async function startCompass() {
+    const D = (window as any).DeviceOrientationEvent;
+    if (!D) { setCompass('no'); return; }
+    try { if (typeof D.requestPermission === 'function' && (await D.requestPermission()) !== 'granted') { setCompass('no'); return; } } catch { setCompass('no'); return; }
+    gotHeading.current = false;
+    setHeading(null);
+    setCompass('on');
+  }
+
+  const c = cell ? FLY[stars[cell]] : null;
+  return (
+    <div className="stack">
+      <div>
+        <h1>{f.title}</h1>
+        <p className="muted">{f.intro}</p>
+      </div>
+
+      <section className="card">
+        <div className="row between">
+          <div className="label">{f.myDirs}</div>
+          {kua && <button className="link" onClick={() => setSex(profile.sex === 'm' ? 'f' : 'm')}>{profile.sex === 'm' ? f.male : f.female} · {f.changeSex}</button>}
+        </div>
+        {!kua ? (
+          <>
+            <p className="small">{f.sexAsk}</p>
+            <div className="seg">
+              <button onClick={() => setSex('m')}>{f.male}</button>
+              <button onClick={() => setSex('f')}>{f.female}</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p><b>{f.gua}:</b> {kua.number} {zh ? kua.trigram.zh : kua.trigram.en} · {kua.group === 'east' ? f.eastGroup : f.westGroup}</p>
+            <div className="small"><b>{f.goodDirs}</b></div>
+            <ul className="reasons">
+              {kua.dirs.filter((d) => STAR8[d.star].good).map((d) => (
+                <li key={d.star}><span className="plus">{dn(d.dir)}</span> {zh ? STAR8[d.star].zh : STAR8[d.star].en}: {zh ? STAR8[d.star].useZh : STAR8[d.star].useEn}</li>
+              ))}
+            </ul>
+            <div className="small"><b>{f.badDirs}</b></div>
+            <ul className="reasons">
+              {kua.dirs.filter((d) => !STAR8[d.star].good).map((d) => (
+                <li key={d.star}><span className="minus">{dn(d.dir)}</span> {zh ? STAR8[d.star].zh : STAR8[d.star].en}: {zh ? STAR8[d.star].useZh : STAR8[d.star].useEn}</li>
+              ))}
+            </ul>
+            <p className="small muted">{f.dirsHow}</p>
+          </>
+        )}
+        <p className="small"><b>{f.elDirs}:</b> {DIRS.filter((d) => chart.favorable.includes(DIR_ELEMENT[d])).map((d) => `${dn(d)} (${el(DIR_ELEMENT[d])})`).join(zh ? '、' : ', ')}</p>
+      </section>
+
+      <section className="card">
+        <div className="row between">
+          <div className="label">{f.stars}</div>
+          <div className="seg sm">
+            <button className={yr === thisYear ? 'on' : ''} onClick={() => { setYr(thisYear); setCell(null); }}>{thisYear}</button>
+            <button className={yr === thisYear + 1 ? 'on' : ''} onClick={() => { setYr(thisYear + 1); setCell(null); }}>{thisYear + 1}</button>
+          </div>
+        </div>
+        <p className="small muted">{f.starsIntro} {zh ? `${yr}年 ${yearGanZhi(yr)}，` : `${yr} (${yearGanZhi(yr)}), `}{f.starsFrom}</p>
+        <div className="fsgrid" role="grid">
+          {GRID.map((g) => {
+            const st = FLY[stars[g]];
+            return (
+              <button key={g} role="gridcell" className={`fscell ${st.tone} ${cell === g ? 'sel' : ''}`} onClick={() => setCell(cell === g ? null : g)} aria-pressed={cell === g}
+                aria-label={`${g === 'C' ? f.center : dn(g)}: ${zh ? st.zh : st.en}, ${zh ? st.zh2 : st.en2}`}>
+                <span className="tiny">{g === 'C' ? f.center : dn(g)}</span>
+                <b>{stars[g]}</b>
+                <span className="tiny">{zh ? st.zh.split(' ')[1] : st.en2.split(/[ ,:]/)[0]}</span>
+              </button>
+            );
+          })}
+        </div>
+        {!c ? <p className="small muted">{f.tapCell}</p> : (
+          <div className="suggest">
+            <p className="small"><b>{cell === 'C' ? f.center : dn(cell as Dir)} · {zh ? c.zh : c.en}</b>: {zh ? c.zh2 : c.en2}</p>
+            <p className="small">{zh ? c.fixZh : c.fixEn}</p>
+            {c.query && <a className="link shopping-link" href={amazon(c.query)} target="_blank" rel="sponsored nofollow noopener noreferrer">{f.shop}</a>}
+            {c.query && <p className="tiny muted">{f.shopNote}</p>}
+          </div>
+        )}
+      </section>
+
+      <section className="card form">
+        <div className="label">{f.check}</div>
+        <p className="small muted">{f.checkIntro}</p>
+        <label>{f.facing}
+          <select value={facing ?? ''} onChange={(e) => { setCompass('off'); setHeading(null); setFacing((e.target.value || null) as Dir | null); }}>
+            <option value="">—</option>
+            {DIRS.map((d) => <option key={d} value={d}>{dn(d)}</option>)}
+          </select>
+        </label>
+        <button type="button" className="ghost" onClick={startCompass}>{f.useCompass}</button>
+        {compass === 'on' && <p className="small muted" aria-live="polite">{heading === null ? f.compassHold : `${f.heading} ${heading}° → ${facing ? dn(facing) : ''}`}</p>}
+        {compass === 'no' && <p className="small muted">{f.compassNo}</p>}
+        {home && (
+          <div className="suggest">
+            <div className="row gap"><VerdictTag v={home.verdict} lang={lang} /><b>{f.houseSits} {dn(home.sitting)} {f.houseFaces} {dn(home.facing)} · {home.score}</b></div>
+            <ul className="reasons">{home.notes.map((n, i) => <li key={i}>{zh ? n.zh : n.en}</li>)}</ul>
+            {FLY[home.doorStarThisYear].query && FLY[home.doorStarThisYear].tone === 'bad' && (
+              <a className="link shopping-link" href={amazon(FLY[home.doorStarThisYear].query!)} target="_blank" rel="sponsored nofollow noopener noreferrer">{f.shop}</a>
+            )}
+          </div>
+        )}
+      </section>
+
+      <section className="card stack">
+        <div className="label">{f.photo}</div>
+        <p className="small muted">{f.photoIntro}</p>
+        <input ref={fileRef} type="file" accept="image/*" hidden onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (!file) return;
+          try { ask({ q: f.photoQ, photo: await shrinkImage(file) }); } catch { /* unreadable image */ }
+        }} />
+        <button className="primary" onClick={() => fileRef.current?.click()}>{f.photoBtn}</button>
+        <button className="ghost" onClick={() => ask({ q: f.askMoreQ })}>{f.askMore}</button>
+      </section>
+      <p className="muted small">{f.note}</p>
     </div>
   );
 }
@@ -791,6 +975,7 @@ function Icon({ name }: { name: Tab }) {
   const p = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true };
   if (name === 'today') return <svg {...p}><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M8 3v4M16 3v4M3.5 10h17" /></svg>;
   if (name === 'ask') return <svg {...p}><path d="M4 5.5h16v10H9l-5 4z" /></svg>;
+  if (name === 'home') return <svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 5.5l2 6.5-2 6.5-2-6.5z" /><path d="M12 3.5v1.5M12 19v1.5M3.5 12H5M19 12h1.5" /></svg>;
   if (name === 'chart') return <svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 3.5a4.25 4.25 0 0 1 0 8.5a4.25 4.25 0 0 0 0 8.5" /></svg>;
   return <svg {...p}><circle cx="12" cy="12" r="3" /><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" /></svg>;
 }

@@ -13,7 +13,8 @@ export default function Privacy() {
       <h2>What we process</h2>
       <ul>
         <li><b>Sign-in</b>: if you continue with Google or Facebook, we receive your name, email address and profile picture from them, and a user ID. We use these only to identify your account.</li>
-        <li><b>Account data</b>: when signed in, your birth details, chart, manually added events, language, calendar link and forwarding-address key are stored privately on our host so you can use them on any device. Settings → Reset all data and signing out removes them from the device; to delete your account data on our side, email us.</li>
+        <li><b>Account data</b>: when signed in, your birth details (and sex, if you chose it for feng shui directions), chart, manually added events, language, calendar link and forwarding-address key are stored privately on our host so you can use them on any device. Settings → Reset all data and signing out removes them from the device; to delete your account data on our side, email us.</li>
+        <li><b>Phone compass</b>: if you use the compass on the Feng Shui screen, the heading is read in your browser only to pick a direction and is never sent to us.</li>
         <li><b>Without an account</b>, birth details and events you enter stay in your browser. Clearing your browser data, or using Settings → Reset, deletes them.</li>
         <li><b>Calendar links</b> (iCal/.ics) you connect are fetched by our server so your events can be read. We pass the events back to your browser and do not store the events; the link itself is stored only if you are signed in.</li>
         <li><b>Questions to FateBot</b> are sent from our server, together with the relevant parts of your reading (chart, day scores and upcoming events), to our AI provider, Anthropic, to write the answer. We do not keep a copy of your questions or answers.</li>

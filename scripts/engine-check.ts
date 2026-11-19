@@ -39,3 +39,13 @@ assert.equal(categorize('周六约会去哪'), 'romance');
 assert.equal(categorize('Grand opening of the store'), 'opening');
 assert.equal(categorize('Client call'), 'meeting');
 console.log('category checks passed');
+// feng shui: standard Gua numbers, annual stars and the Li Chun year boundary
+import { kuaOf, annualStars, liChunYear, readHome } from '../lib/fengshui';
+assert.equal(kuaOf(1977, 'm').number, 2); assert.equal(kuaOf(1977, 'f').number, 1);
+assert.equal(kuaOf(1984, 'm').number, 7); assert.equal(kuaOf(1990, 'f').number, 8);
+assert.equal(kuaOf(2000, 'm').number, 9); assert.equal(kuaOf(2000, 'f').number, 6);
+assert.deepEqual(annualStars(2026), { C: 1, NW: 2, W: 3, NE: 4, S: 5, N: 6, SW: 7, E: 8, SE: 9 });
+assert.equal(annualStars(2027).N, 5); assert.equal(annualStars(2024).C, 3);
+assert.equal(liChunYear(new Date(2027, 0, 20)), 2026); assert.equal(liChunYear(new Date(2027, 1, 10)), 2027);
+assert.equal(readHome('N', kuaOf(1984, 'm'), ['water'], 2026).match, false); // West-group person, East-group house
+console.log('feng shui checks passed');
