@@ -186,21 +186,21 @@ export function scoreMoment(chart: Chart, when: Date, category: Category = 'gene
   // 1. day stem element vs favorable elements
   const dEl = STEM[dayStem].el;
   if (chart.favorable.includes(dEl))
-    add(8, `Today is a ${STEM[dayStem].pinyin} ${ELEMENT_NAME[dEl].en} day, an element that helps your ${dm} Day Master.`,
-      `今日${dayStem}${ELEMENT_NAME[dEl].zh}，是你的喜用之气，扶助日主${dmZh}。`);
+    add(8, `It is a ${STEM[dayStem].pinyin} ${ELEMENT_NAME[dEl].en} day, an element that helps your ${dm} Day Master.`,
+      `当日${dayStem}${ELEMENT_NAME[dEl].zh}，是你的喜用之气，扶助日主${dmZh}。`);
   else
-    add(-6, `Today is a ${STEM[dayStem].pinyin} ${ELEMENT_NAME[dEl].en} day, an element that works against your ${dm} Day Master.`,
-      `今日${dayStem}${ELEMENT_NAME[dEl].zh}，非你喜用，对日主${dmZh}不利。`);
+    add(-6, `It is a ${STEM[dayStem].pinyin} ${ELEMENT_NAME[dEl].en} day, an element that works against your ${dm} Day Master.`,
+      `当日${dayStem}${ELEMENT_NAME[dEl].zh}，非你喜用，对日主${dmZh}不利。`);
 
   // 2. day branch vs natal day branch and year branch
   const nb = branchLabel(chart.dayBranch), db = branchLabel(dayBranch);
   const dRel = branchRelation(dayBranch, chart.dayBranch);
-  if (dRel === 'clash') add(-15, `The ${db.en} day clashes with your ${nb.en} day branch: friction and reversals.`, `今日${dayBranch}与你日支${chart.dayBranch}相冲，易生变数。`);
-  if (dRel === 'harm') add(-7, `The ${db.en} day harms your ${nb.en} day branch: hidden obstacles.`, `今日${dayBranch}与你日支${chart.dayBranch}相害，暗中阻碍。`);
-  if (dRel === 'harmony') add(9, `The ${db.en} day combines with your ${nb.en} day branch: things come together.`, `今日${dayBranch}与你日支${chart.dayBranch}六合，人和事顺。`);
-  if (dRel === 'trine') add(5, `The ${db.en} day forms a trine with your ${nb.en} day branch.`, `今日${dayBranch}与你日支${chart.dayBranch}三合，有助力。`);
+  if (dRel === 'clash') add(-15, `The ${db.en} day clashes with your ${nb.en} day branch: friction and reversals.`, `当日${dayBranch}与你日支${chart.dayBranch}相冲，易生变数。`);
+  if (dRel === 'harm') add(-7, `The ${db.en} day harms your ${nb.en} day branch: hidden obstacles.`, `当日${dayBranch}与你日支${chart.dayBranch}相害，暗中阻碍。`);
+  if (dRel === 'harmony') add(9, `The ${db.en} day combines with your ${nb.en} day branch: things come together.`, `当日${dayBranch}与你日支${chart.dayBranch}六合，人和事顺。`);
+  if (dRel === 'trine') add(5, `The ${db.en} day forms a trine with your ${nb.en} day branch.`, `当日${dayBranch}与你日支${chart.dayBranch}三合，有助力。`);
   if (branchRelation(dayBranch, chart.yearBranch) === 'clash')
-    add(-6, `Today clashes with your zodiac sign (${BRANCH[chart.yearBranch].animal}).`, `今日冲你的生肖（属${BRANCH[chart.yearBranch].zh}）。`);
+    add(-6, `The day clashes with your zodiac sign (${BRANCH[chart.yearBranch].animal}).`, `当日冲你的生肖（属${BRANCH[chart.yearBranch].zh}）。`);
 
   // 3. hour branch vs natal day branch
   {
@@ -221,16 +221,16 @@ export function scoreMoment(chart: Chart, when: Date, category: Category = 'gene
     const hourYi: string[] = lunar.getTimeYi(), hourJi: string[] = lunar.getTimeJi();
     const hit = (list: string[]) => words.find((w) => list.includes(w));
     let w: string | undefined;
-    if ((w = hit(dayYi))) add(7, `The almanac favors this kind of activity today (${w}).`, `黄历今日宜「${w}」。`);
-    if ((w = hit(dayJi))) add(-10, `The almanac advises against this kind of activity today (${w}).`, `黄历今日忌「${w}」。`);
+    if ((w = hit(dayYi))) add(7, `The almanac favors this kind of activity that day (${w}).`, `黄历当日宜「${w}」。`);
+    if ((w = hit(dayJi))) add(-10, `The almanac advises against this kind of activity that day (${w}).`, `黄历当日忌「${w}」。`);
     if ((w = hit(hourYi))) add(3, `This hour suits it (${w}).`, `此时宜「${w}」。`);
     if ((w = hit(hourJi))) add(-5, `This hour is unsuited to it (${w}).`, `此时忌「${w}」。`);
   }
 
   // 5. day officer (建除十二值星)
   const officer: string = lunar.getZhiXing();
-  if (officer === '破') add(-6, 'A "Break" day in the almanac: avoid starting important things.', '今日值「破」，不宜开始大事。');
-  if (officer === '成' || officer === '开') add(4, `An "${officer === '成' ? 'Success' : 'Open'}" day in the almanac.`, `今日值「${officer}」，利于成事。`);
+  if (officer === '破') add(-6, 'A "Break" day in the almanac: avoid starting important things.', '当日值「破」，不宜开始大事。');
+  if (officer === '成' || officer === '开') add(4, `An "${officer === '成' ? 'Success' : 'Open'}" day in the almanac.`, `当日值「${officer}」，利于成事。`);
 
   const score = Math.max(5, Math.min(98, 60 + reasons.reduce((a, r) => a + r.delta, 0)));
   return { score, verdict: verdictOf(score), reasons, dayGanZhi: `${dayStem}${dayBranch}`, hourGanZhi: `${hourStem}${hourBranch}` };
@@ -250,7 +250,7 @@ export function scoreDay(chart: Chart, date: Date): DaySummary {
     start: h, score: scoreMoment(chart, new Date(date.getFullYear(), date.getMonth(), date.getDate(), h, 30), 'general').score,
   })).sort((a, b) => b.score - a.score);
   const score = Math.max(5, Math.min(98, 60 + dayOnly.reduce((a, r) => a + r.delta, 0)));
-  return { score, verdict: verdictOf(score), ganZhi: base.dayGanZhi, yi: lunar.getDayYi(), ji: lunar.getDayJi(), reasons: dayOnly, bestHours: hours.slice(0, 2) };
+  return { score, verdict: verdictOf(score), ganZhi: base.dayGanZhi, yi: lunar.getDayYi(), ji: lunar.getDayJi(), reasons: dayOnly, bestHours: hours.slice(0, 2).sort((a, b) => a.start - b.start) };
 }
 
 export interface CalEvent { id: string; title: string; start: string; end: string; allDay?: boolean; source: 'manual' | 'calendar' }

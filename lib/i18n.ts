@@ -25,7 +25,7 @@ export const T = {
     noBetter: 'No clearly better slot in the next 3 days. If you keep this time, prepare well and stay flexible.',
     calendarNote: 'This event is from your calendar. Copy the note below to reschedule it there.',
     copyNote: 'Copy reschedule note', copied: 'Copied',
-    bestHours: 'Best hours today',
+    bestHours: 'Best hours',
     del: 'Delete',
     prevDay: 'Previous day', nextDay: 'Next day',
     myChart: 'My chart',
@@ -79,7 +79,7 @@ export const T = {
     noBetter: '未来 3 天没有明显更好的时段。如果保持原时间，请做好准备、留有余地。',
     calendarNote: '这条日程来自你的日历。复制下面的说明，到日历里改期。',
     copyNote: '复制改期说明', copied: '已复制',
-    bestHours: '今日吉时',
+    bestHours: '吉时',
     del: '删除',
     prevDay: '前一天', nextDay: '后一天',
     myChart: '我的命盘',
@@ -121,7 +121,7 @@ export const ALMANAC_EN: Record<string, string> = {
   斋醮: 'temple rites', 栽种: 'planting', 牧养: 'raising animals', 开仓: 'opening storehouses', 出火: 'moving the hearth', 入学: 'starting school',
   求医: 'seeing a doctor', 治病: 'medical treatment', 沐浴: 'bathing rituals', 扫舍: 'cleaning house', 安床: 'placing a bed', 词讼: 'lawsuits',
   造船: 'boatbuilding', 乘船: 'boat travel', 赴任: 'starting a post', 见贵: 'meeting VIPs', 求财: 'seeking wealth', 进人口: 'hiring', 诸事不宜: 'nothing major',
-  余事勿取: 'nothing else', 塑绘: 'painting statues', 经络: 'weaving', 酝酿: 'brewing', 纳畜: 'buying livestock', 补垣: 'repairing walls', 平治道涂: 'road repair',
+  余事勿取: 'nothing else', 捕捉: 'catching pests', 畋猎: 'hunting', 结网: 'net making', 取渔: 'fishing', 会友: 'meeting friends', 上册: 'registering', 上表章: 'submitting reports', 裁衣: 'tailoring', 竖柱: 'raising pillars', 立碑: 'setting stones', 合帐: 'hanging drapes', 开柱眼: 'carving posts', 归宁: 'family visits', 求医疗病: 'seeing a doctor', 针灸: 'acupuncture', 置产: 'buying property', 造仓: 'building storehouses', 习艺: 'learning skills', 断蚁: 'pest control', 放水: 'draining water', 修饰垣墙: 'repairing walls', 造畜稠: 'building pens', 作梁: 'making beams', 分居: 'living apart', 安香: 'setting altars', 谢土: 'earth rites', 招赘: 'marrying in', 纳婿: 'marrying in', 雕刻: 'carving', 开生坟: 'preparing tombs', 合寿木: 'making coffins', 启钻: 'exhumation', 修坟: 'repairing tombs', 塑绘: 'painting statues', 经络: 'weaving', 酝酿: 'brewing', 纳畜: 'buying livestock', 补垣: 'repairing walls', 平治道涂: 'road repair',
   破屋: 'demolishing', 坏垣: 'tearing down walls', 安机械: 'installing machines', 开池: 'digging ponds', 开渠: 'digging channels', 掘井: 'digging wells',
 };
 export const almanac = (w: string, lang: Lang) => (lang === 'en' ? ALMANAC_EN[w] ?? w : w);

@@ -83,6 +83,16 @@ export function fallbackAnswer(chart: Chart, question: string, lang: Lang): stri
     .sort((a, b) => b.m.score - a.m.score).slice(0, 2);
   lines.push(`${lang === 'zh' ? '最佳时段' : 'Best times'}: ${best.map((b) => `${fmtHour(b.h, lang)}–${fmtHour(b.h + 2, lang)} (${t[b.m.verdict]})`).join(lang === 'zh' ? '，' : ', ')}`);
   if (day.reasons[0]) lines.push(lang === 'zh' ? day.reasons[0].zh : day.reasons[0].en);
+  if (day.verdict === 'bad') {
+    for (let i = 1; i <= 7; i++) {
+      const n = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
+      const best2 = [9, 11, 13, 15, 17].map((h) => ({ h, m: scoreMoment(chart, new Date(n.getFullYear(), n.getMonth(), n.getDate(), h, 30), category) })).sort((a, b) => b.m.score - a.m.score)[0];
+      if (best2.m.verdict === 'good') {
+        lines.push(lang === 'zh' ? `更好的选择：${fmtDay(n, lang)} ${fmtHour(best2.h, lang)}（${t.good}，${best2.m.score}）。` : `A better option: ${fmtDay(n, lang)} at ${fmtHour(best2.h, lang)} (${t.good}, ${best2.m.score}).`);
+        break;
+      }
+    }
+  }
   return lines.join('\n');
 }
 
