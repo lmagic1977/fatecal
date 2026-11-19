@@ -156,7 +156,7 @@ export default function App() {
   // Everyone signs up first (Google, Facebook, email or phone), then fills in their birth details.
   if (!ready) return <div className="preload"><Landing lang={lang} setLang={setLang} providers={[]} onDone={() => {}} /></div>;
   if (!ACCOUNTS_ON && (!profile || !chart)) return <Landing lang={lang} setLang={setLang} providers={[]} onDone={(p) => { setProfile(p); save(K.profile, p); }} />;
-  if (ACCOUNTS_ON && authed === 'checking') return <div className="shell onboard"><div className="hero"><div className="brand big">FateCal</div><p className="muted" aria-live="polite">{t.loading}</p></div></div>;
+  if (ACCOUNTS_ON && authed === 'checking') return <div className="shell onboard"><div className="hero"><Logo big /><p className="muted" aria-live="polite">{t.loading}</p></div></div>;
   if (ACCOUNTS_ON && authed === 'out') return <Landing lang={lang} setLang={setLang} providers={providers} onDone={() => {}} />;
   if (!profile || !chart) {
     return <Onboarding lang={lang} setLang={setLang} initial={null} account={account} onDone={(p) => { setProfile(p); save(K.profile, p); }} />;
@@ -165,7 +165,7 @@ export default function App() {
   return (
     <div className="shell">
       <header className="top">
-        <div className="brand">FateCal</div>
+        <Logo />
         <button className="lang" onClick={() => setLang(lang === 'en' ? 'zh' : 'en')} aria-label="Switch language">{lang === 'en' ? '中文' : 'EN'}</button>
       </header>
       <main className="main">
@@ -234,7 +234,7 @@ function Onboarding({ lang, setLang, initial, onDone, onCancel, account = null, 
     <div className="shell onboard">
       {!initial && (
         <div className="hero">
-          <div className="brand big">FateCal</div>
+          <Logo big />
           <h1>{t.welcome}{account?.name && !account.name.includes('@') && !account.name.includes('*') ? `, ${account.name}` : ''}</h1>
           <p className="muted">{t.profileIntro}</p>
           <div className="seg">
@@ -252,35 +252,87 @@ function Onboarding({ lang, setLang, initial, onDone, onCancel, account = null, 
 
 // ---------------- landing and sign-up ----------------
 
+function Logo({ big = false }: { big?: boolean }) {
+  return <img className={big ? 'logo big' : 'logo'} src="/logo.svg" alt="FateCal" width={big ? 172 : 115} height={big ? 42 : 28} />;
+}
+
 function Landing({ lang, setLang, providers, onDone }: { lang: Lang; setLang: (l: Lang) => void; providers: string[]; onDone: (p: Profile) => void }) {
   const t = T[lang];
+  const l = t.lp;
+  const [moved, setMoved] = useState(false);
+  const [why, setWhy] = useState(false);
+  const go = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   return (
     <div className="shell onboard">
+      <header className="top">
+        <Logo />
+        <button className="lang" onClick={() => setLang(lang === 'en' ? 'zh' : 'en')} aria-label="Switch language">{lang === 'en' ? '中文' : 'EN'}</button>
+      </header>
       <div className="hero">
-        <div className="brand big">FateCal</div>
-        <p className="lead">{t.tagline}</p>
-        <div className="card sample" aria-label={t.sampleLabel}>
-          <div className="tiny">{t.sampleLabel}</div>
-          <div className="row gap top-align">
-            <div className="time">2:00 PM</div>
-            <div className="grow">
-              <div className="ev-title">{t.sampleTitle}</div>
-              <div className="muted small">{t.sampleWhy}</div>
-            </div>
-            <span className="tag bad">{t.bad}</span>
-          </div>
-          <div className="suggest small">{t.sampleSuggest}</div>
+        <div className="eyebrow">{l.eyebrow}</div>
+        <h1 className="display">{l.h1a}<br /><span>{l.h1b}</span></h1>
+        <p className="lead">{l.sub}</p>
+        <div className="row gap wrap">
+          <button className="primary" onClick={() => go('start')}>{l.start}</button>
+          <button className="ghost" onClick={() => go('demo')}>{l.tryIt}</button>
         </div>
-        <ul className="points">{t.points.map((x) => <li key={x}>{x}</li>)}</ul>
-        <details className="explain">
-          <summary>{t.whatIsBazi}</summary>
-          <p className="small">{t.baziExplain}</p>
-        </details>
+        <p className="tiny">{l.tryNote}</p>
+      </div>
+
+      <section id="demo" className="demo" aria-label={l.demoLabel}>
+        <div className="tiny demo-k">{l.demoLabel}</div>
+        <div className="demo-card">
+          <div className="row between"><b>{l.week}</b></div>
+          <div className="wk">
+            {l.days.map((d, i) => <span key={d} className={(!moved && i === 1) || (moved && i === 3) ? 'on' : ''}>{d}</span>)}
+          </div>
+          <div className="row between top-align demo-ev">
+            <div>
+              <div className="tiny">{moved ? l.recTime : l.evTime}</div>
+              <div className="ev-title">{l.evTitle}</div>
+            </div>
+            <span className={`tag ${moved ? 'good' : 'bad'}`}>{moved ? t.good : l.evBad}</span>
+          </div>
+          {!moved ? (
+            <>
+              <div className="rec row between"><div><div className="tiny">{l.recLabel}</div><b>{l.recTime}</b></div><b>76</b></div>
+              <div className="row gap">
+                <button className="primary" onClick={() => { setMoved(true); setWhy(false); }}>{l.moveBtn}</button>
+                <button className="link" onClick={() => setWhy(!why)} aria-expanded={why}>{l.why}</button>
+              </div>
+            </>
+          ) : (
+            <div className="row gap"><span className="small grow" aria-live="polite">{l.moved}</span><button className="link" onClick={() => setMoved(false)}>{l.undo}</button></div>
+          )}
+          {why && !moved && <p className="small muted">{l.whyText}</p>}
+        </div>
+      </section>
+
+      <section className="feats">
+        {([[l.f1k, l.f1h, l.f1p], [l.f2k, l.f2h, l.f2p], [l.f3k, l.f3h, l.f3p]] as string[][]).map(([k, h, p]) => (
+          <div key={k}><div className="eyebrow sm">{k}</div><h3>{h}</h3><p className="small muted">{p}</p></div>
+        ))}
+      </section>
+
+      <section className="feats more">
+        <div className="eyebrow sm">{l.moreH}</div>
+        {l.more.map(([h, p]) => <div key={h}><h3>{h}</h3><p className="small muted">{p}</p></div>)}
+      </section>
+
+      <section className="faq">
+        <div className="eyebrow">{l.faqK}</div>
+        <h2 className="display sm">{l.faqH1}<br />{l.faqH2}</h2>
+        {l.faq.map(([q, a]) => <details key={q}><summary>{q}</summary><p className="small muted">{a}</p></details>)}
+      </section>
+
+      <section id="start" className="startform">
+        <h2 className="display sm">{l.formH}</h2>
+        <p className="small muted">{l.formP}</p>
         <div className="seg">
           <button className={lang === 'en' ? 'on' : ''} onClick={() => setLang('en')}>English</button>
           <button className={lang === 'zh' ? 'on' : ''} onClick={() => setLang('zh')}>中文</button>
         </div>
-      </div>
+      </section>
       {ACCOUNTS_ON ? <SignUp lang={lang} providers={providers} /> : <Onboarding lang={lang} setLang={setLang} initial={null} onDone={onDone} embedded />}
       <p className="muted small pad">{t.simplified}</p>
       <Footer lang={lang} />

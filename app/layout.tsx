@@ -8,10 +8,10 @@ export const metadata: Metadata = {
   openGraph: { title: 'FateCal', description: 'Your BaZi advisor that reads your schedule and tells you when to do what.', url: 'https://fatecal.com', siteName: 'FateCal', type: 'website' },
   twitter: { card: 'summary_large_image', title: 'FateCal', description: 'Your BaZi advisor that reads your schedule.' },
   manifest: '/manifest.webmanifest',
-  icons: { icon: '/icon.svg', apple: '/icon.svg' },
+  icons: { icon: [{ url: '/icon.svg', type: 'image/svg+xml' }, { url: '/icon-192.png', sizes: '192x192', type: 'image/png' }], apple: '/apple-touch-icon.png' },
   appleWebApp: { capable: true, title: 'FateCal', statusBarStyle: 'default' },
 };
-export const viewport: Viewport = { themeColor: '#F6F1E7', width: 'device-width', initialScale: 1 };
+export const viewport: Viewport = { themeColor: '#F8F6EF', width: 'device-width', initialScale: 1 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
