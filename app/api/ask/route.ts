@@ -27,6 +27,8 @@ Rules:
 - If the question is not about timing, the person's chart, feng shui or their schedule, answer briefly and steer back.
 - Quote reasons accurately: if a reason is about the day, say the day; if it is about the hour, say the hour. Do not move a reason from one to the other.
 - Plain text only: no markdown, no asterisks, no headings. Use short lines or "•" bullets.
+- Keep the whole answer under about 180 words (or 300 Chinese characters).
+- In Chinese replies write verdicts as 吉 / 平 / 凶 and hours as 申时（下午3–5点）; no English words.
 - Reply in the language given in <lang> (en = English, zh = Simplified Chinese).`;
 
 export async function POST(req: Request) {
@@ -55,7 +57,7 @@ export async function POST(req: Request) {
   try {
     const res = await client.messages.create({
       model: process.env.FATECAL_MODEL || 'claude-haiku-5-5',
-      max_tokens: 2000,
+      max_tokens: 4000,
       system: SYSTEM,
       messages,
     });

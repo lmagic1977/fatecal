@@ -52,6 +52,7 @@ export function buildContext(chart: Chart, events: CalEvent[], question: string,
   const category: Category = categorize(question);
   const now = new Date();
   const tr = (r: { en: string; zh: string }) => (lang === 'zh' ? r.zh : r.en);
+  const vw = (v: 'good' | 'neutral' | 'bad') => T[lang][v];
   const at = (o: number, h = 0, m = 0) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + o, h, m);
   const targets = targetOffsets(question, now);
   const detailed = [...new Set([0, 1, 2, ...targets])].sort((a, b) => a - b).slice(0, 10);
@@ -61,10 +62,10 @@ export function buildContext(chart: Chart, events: CalEvent[], question: string,
     const s = scoreDay(chart, d);
     const slots = [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23].map((h) => {
       const m = scoreMoment(chart, at(o, h, 30), category);
-      return { from: fmtHour(h, lang), to: fmtHour((h + 2) % 24, lang), ganZhi: m.hourGanZhi, verdict: m.verdict, score: m.score, reasons: m.reasons.map(tr) };
+      return { from: fmtHour(h, lang), to: fmtHour((h + 2) % 24, lang), ganZhi: m.hourGanZhi, verdict: vw(m.verdict), score: m.score, reasons: m.reasons.map(tr) };
     });
     return {
-      date: fmtDay(d, lang), iso: localIso(d), ganZhi: s.ganZhi, verdict: s.verdict, score: s.score,
+      date: fmtDay(d, lang), iso: localIso(d), ganZhi: s.ganZhi, verdict: vw(s.verdict), score: s.score,
       goodFor: s.yi.map((w) => almanac(w, lang)), avoid: s.ji.map((w) => almanac(w, lang)), almanacYiZh: s.yi, almanacJiZh: s.ji,
       reasons: s.reasons.map(tr), slots,
     };
@@ -79,8 +80,8 @@ export function buildContext(chart: Chart, events: CalEvent[], question: string,
       .map((h) => ({ h, m: scoreMoment(chart, at(o, h, 30), category) }))
       .sort((a, b) => b.m.score - a.m.score)[0];
     calendar.push({
-      date: fmtDay(d, lang), iso: localIso(d), ganZhi: s.ganZhi, day: s.verdict, dayScore: s.score,
-      bestSlot: `${fmtHour(best.h, lang)}-${fmtHour(best.h + 2, lang)} ${best.m.verdict} ${best.m.score}`,
+      date: fmtDay(d, lang), iso: localIso(d), ganZhi: s.ganZhi, day: vw(s.verdict), dayScore: s.score,
+      bestSlot: `${fmtHour(best.h, lang)}-${fmtHour(best.h + 2, lang)} ${vw(best.m.verdict)} ${best.m.score}`,
       bestSlotWhy: best.m.reasons.filter((r) => r.delta > 0).map(tr).slice(0, 2),
       yiZh: s.yi.slice(0, 10), jiZh: s.ji.slice(0, 10),
     });
@@ -90,7 +91,7 @@ export function buildContext(chart: Chart, events: CalEvent[], question: string,
     .slice(0, 40)
     .map((e) => {
       const r = readEvent(chart, e, events);
-      return { title: e.title, start: new Date(e.start).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US'), verdict: r.verdict, score: r.score, reasons: r.reasons.map((x) => (lang === 'zh' ? x.zh : x.en)), betterTimes: r.alternatives.map((a) => new Date(a.start).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US')) };
+      return { title: e.title, start: new Date(e.start).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US'), verdict: vw(r.verdict), score: r.score, reasons: r.reasons.map((x) => (lang === 'zh' ? x.zh : x.en)), betterTimes: r.alternatives.map((a) => new Date(a.start).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US')) };
     });
   return {
     now: now.toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US'),
