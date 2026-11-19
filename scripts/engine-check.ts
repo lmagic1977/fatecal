@@ -34,3 +34,8 @@ for (const a of r.alternatives) assert.ok(a.score >= r.score + 8);
 // a full week of scores stays within range
 for (let i = 0; i < 60; i++) { const s = scoreDay(c, new Date(2026, 10, 19 + i)); assert.ok(s.score >= 5 && s.score <= 98); }
 console.log('engine checks passed');
+assert.equal(categorize('明天晚上同房好吗'), 'conception');
+assert.equal(categorize('周六约会去哪'), 'romance');
+assert.equal(categorize('Grand opening of the store'), 'opening');
+assert.equal(categorize('Client call'), 'meeting');
+console.log('category checks passed');

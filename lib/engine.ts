@@ -8,7 +8,8 @@ import { Solar } from 'lunar-javascript';
 export type Element = 'wood' | 'fire' | 'earth' | 'metal' | 'water';
 export type Verdict = 'good' | 'neutral' | 'bad';
 export type Category =
-  | 'meeting' | 'signing' | 'travel' | 'moving' | 'money' | 'build' | 'wedding' | 'medical' | 'general';
+  | 'meeting' | 'signing' | 'travel' | 'moving' | 'money' | 'build' | 'wedding' | 'medical'
+  | 'conception' | 'romance' | 'opening' | 'haircut' | 'study' | 'cleaning' | 'general';
 
 export interface Reason { delta: number; en: string; zh: string }
 
@@ -139,6 +140,10 @@ export function computeChart(b: BirthInput): Chart {
 // ---------- event categories ----------
 
 const CATEGORY_WORDS: [Category, RegExp][] = [
+  ['conception', /同房|备孕|求子|求嗣|怀孕|造人|受孕|conceive|conception|get pregnant|try(ing)? for a baby|ttc|intimacy|make love/i],
+  ['romance', /约会|表白|求婚|相亲|date night|first date|\bdate\b|propose|proposal|romantic/i],
+  ['opening', /开业|开张|开市|开店|上线|launch|grand opening|open(ing)? (a |the )?(store|shop|business)/i],
+  ['haircut', /理发|剪发|剪头|haircut|hair cut|barber|salon/i],
   ['signing', /sign|contract|agreement|lease|closing|escrow|签约|签合同|合同|签署|过户/i],
   ['wedding', /wedding|marry|engagement|婚|订婚/i],
   ['moving', /move|moving|move-in|搬家|入住|乔迁/i],
@@ -146,6 +151,8 @@ const CATEGORY_WORDS: [Category, RegExp][] = [
   ['travel', /flight|trip|travel|airport|drive to|出差|旅行|航班|出发/i],
   ['medical', /doctor|dentist|surgery|clinic|hospital|医生|手术|医院|看病/i],
   ['money', /invest|buy|purchase|bank|loan|pay|shopping|投资|买|购|贷款|理财/i],
+  ['study', /考试|面试准备|学习|上课|入学|\bexams?\b|study|class|school/i],
+  ['cleaning', /大扫除|扫除|打扫|清洁|cleaning|declutter/i],
   ['meeting', /meet|talk|partner|call|interview|pitch|negotiat|sync|1:1|lunch|dinner|会|谈|面试|约|拜访|客户/i],
 ];
 export function categorize(title: string): Category {
@@ -162,7 +169,13 @@ const ALMANAC: Record<Category, string[]> = {
   money: ['纳财', '求财', '交易'],
   build: ['动土', '修造', '破土'],
   wedding: ['嫁娶', '纳采'],
-  medical: ['求医', '疗病'],
+  medical: ['求医', '疗病', '治病'],
+  conception: ['求嗣', '嫁娶'],
+  romance: ['嫁娶', '纳采', '会亲友'],
+  opening: ['开市', '交易', '挂匾'],
+  haircut: ['理发'],
+  study: ['入学', '习艺'],
+  cleaning: ['扫舍', '解除'],
   general: [],
 };
 

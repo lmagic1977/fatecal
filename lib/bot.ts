@@ -14,13 +14,13 @@ export function buildContext(chart: Chart, events: CalEvent[], question: string,
   for (let i = 0; i < 7; i++) {
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
     const s = scoreDay(chart, d);
-    const slots = [7, 9, 11, 13, 15, 17, 19, 21].map((h) => {
+    const slots = [7, 9, 11, 13, 15, 17, 19, 21, 23].map((h) => {
       const m = scoreMoment(chart, new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, 30), category);
       return { from: fmtHour(h, lang), to: fmtHour(h + 2, lang), ganZhi: m.hourGanZhi, verdict: m.verdict, score: m.score, reasons: m.reasons.map((r) => (lang === 'zh' ? r.zh : r.en)) };
     });
     days.push({
       date: fmtDay(d, lang), iso: d.toISOString().slice(0, 10), ganZhi: s.ganZhi, verdict: s.verdict, score: s.score,
-      goodFor: s.yi.slice(0, 8).map((w) => almanac(w, lang)), avoid: s.ji.slice(0, 8).map((w) => almanac(w, lang)),
+      goodFor: s.yi.map((w) => almanac(w, lang)), avoid: s.ji.map((w) => almanac(w, lang)), almanacYiZh: s.yi, almanacJiZh: s.ji,
       reasons: s.reasons.map((r) => (lang === 'zh' ? r.zh : r.en)), slots,
     });
   }
@@ -33,7 +33,7 @@ export function buildContext(chart: Chart, events: CalEvent[], question: string,
     });
   return {
     now: now.toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US'),
-    activityScored: category,
+    activityScored: category, // 'general' means no specific activity was recognized; slots still carry the full day/hour reading
     chart: {
       pillars: chart.pillars.map((p) => `${p.label}: ${p.stem}${p.branch} (${STEM[p.stem].pinyin} ${BRANCH[p.branch].pinyin})`),
       dayMaster: `${chart.dayMaster} ${STEM[chart.dayMaster].pinyin} ${ELEMENT_NAME[chart.dayMasterElement].en}`,
