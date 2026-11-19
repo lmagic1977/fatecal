@@ -50,7 +50,7 @@ export async function POST(req: Request) {
   try {
     const res = await client.messages.create({
       model: process.env.FATECAL_MODEL || 'claude-haiku-5-5',
-      max_tokens: 600,
+      max_tokens: 2000,
       system: SYSTEM,
       messages,
     });
