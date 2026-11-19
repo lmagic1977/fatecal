@@ -13,6 +13,13 @@ export const viewport: Viewport = { themeColor: '#F6F1E7', width: 'device-width'
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        <script
+          async
+          src="https://tp-em.com/NjAzNTUx.js?t=603551"
+          data-cmp-ab="2"
+        />
+      </head>
       <body>{children}</body>
     </html>
   );
