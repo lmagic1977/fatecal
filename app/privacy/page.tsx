@@ -8,19 +8,23 @@ export default function Privacy() {
   return (
     <LegalPage title="Privacy Policy" updated="November 19, 2026">
       <h2>The short version</h2>
-      <p>FateCal does not have accounts yet. Your birth details, chart and events are stored in your own browser (local storage), not on our servers. We do not sell your personal information.</p>
+      <p>You can use FateCal without an account; then your birth details, chart and events stay in your own browser (local storage). If you sign in with Google or Facebook, we keep them in your account so they follow you across devices. We do not sell your personal information.</p>
 
       <h2>What we process</h2>
       <ul>
-        <li><b>Birth details and events</b> you enter stay in your browser. Clearing your browser data, or using Settings → Reset, deletes them.</li>
-        <li><b>Calendar links</b> (iCal/.ics) you connect are fetched by our server so your events can be read. We pass the events back to your browser and do not store the link or the events.</li>
+        <li><b>Sign-in</b>: if you continue with Google or Facebook, we receive your name, email address and profile picture from them, and a user ID. We use these only to identify your account.</li>
+        <li><b>Account data</b>: when signed in, your birth details, chart, manually added events, language, calendar link and forwarding-address key are stored privately on our host so you can use them on any device. Settings → Reset all data and signing out removes them from the device; to delete your account data on our side, email us.</li>
+        <li><b>Without an account</b>, birth details and events you enter stay in your browser. Clearing your browser data, or using Settings → Reset, deletes them.</li>
+        <li><b>Calendar links</b> (iCal/.ics) you connect are fetched by our server so your events can be read. We pass the events back to your browser and do not store the events; the link itself is stored only if you are signed in.</li>
         <li><b>Questions to FateBot</b> are sent from our server, together with the relevant parts of your reading (chart, day scores and upcoming events), to our AI provider, Anthropic, to write the answer. We do not keep a copy of your questions or answers.</li>
         <li><b>Technical logs</b>: our host, Vercel, keeps standard server logs (such as IP address, browser type and request time) for security and reliability.</li>
       </ul>
 
       <h2>Third parties</h2>
       <ul>
-        <li><b>Vercel</b> hosts the site.</li>
+        <li><b>Vercel</b> hosts the site and stores account data and forwarded-email extracts.</li>
+        <li><b>Google</b> and <b>Meta (Facebook)</b> handle sign-in if you choose them.</li>
+        <li><b>Postmark</b> receives emails you forward to your FateCal address and passes them to us; we keep only a short extract until your app collects it.</li>
         <li><b>Anthropic</b> processes FateBot questions as described above.</li>
         <li><b>Google Fonts</b> serves the site's fonts.</li>
         <li><b>Travelpayouts</b>: the site loads a script from this travel partner network, which may set cookies or similar identifiers to attribute bookings you make through travel links.</li>

@@ -7,6 +7,7 @@ import {
 import { T, Lang, almanac } from '@/lib/i18n';
 import { buildContext, fallbackAnswer, fmtDay, fmtHour } from '@/lib/bot';
 import Footer from '@/components/Footer';
+import { signIn, signOut } from 'next-auth/react';
 import ShoppingResources from '@/components/ShoppingResources';
 import { CONTACT_EMAIL } from '@/lib/site';
 import type { MailItem } from '@/lib/mail';
@@ -49,6 +50,9 @@ export default function App() {
   const [mail, setMail] = useState<MailItem[]>([]);
   const [mailKey, setMailKey] = useState<string | null>(null);
   const [mailAddr, setMailAddr] = useState<string | null>(null);
+  const [account, setAccount] = useState<Account | null>(null);
+  const [providers, setProviders] = useState<string[]>([]);
+  const synced = useRef(false);
 
   useEffect(() => {
     const stored = load<Lang | null>(K.lang, null);
@@ -65,6 +69,33 @@ export default function App() {
   useEffect(() => { if (ready) save(K.events, manual); }, [manual, ready]);
   useEffect(() => { if (ready) save(K.ics, ics); }, [ics, ready]);
   useEffect(() => { if (ready) save(K.mail, mail.slice(-200)); }, [mail, ready]);
+
+  // Accounts: when signed in, the chart, events and settings are kept on the server and follow the user.
+  useEffect(() => {
+    if (!ready) return;
+    fetch('/api/auth/providers-list').then((r) => r.json()).then((j) => setProviders(j.providers ?? [])).catch(() => {});
+    fetch('/api/sync').then((r) => (r.ok ? r.json() : null)).then((j) => {
+      if (!j?.user) { synced.current = true; return; }
+      setAccount(j.user);
+      const d = j.data;
+      if (d?.profile) {
+        setProfile(d.profile); save(K.profile, d.profile);
+        if (Array.isArray(d.events)) setManual(d.events);
+        if (d.icsUrl && !ics?.url) setIcs({ url: d.icsUrl, events: [] });
+        if (d.lang) setLang(d.lang);
+        if (d.mailKey && !mailKey) { save(K.mailKey, d.mailKey); setMailKey(d.mailKey); }
+      }
+      synced.current = true;
+    }).catch(() => { synced.current = true; });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
+  useEffect(() => {
+    if (!ready || !account || !synced.current || !profile) return;
+    const id = setTimeout(() => {
+      fetch('/api/sync', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ v: 1, updatedAt: new Date().toISOString(), profile, events: manual, icsUrl: ics?.url ?? null, lang, mailKey }) }).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(id);
+  }, [ready, account, profile, manual, ics?.url, lang, mailKey]);
 
   // Fetch forwarded mail: on start, then every minute while the app is open.
   async function checkMail(key = mailKey, peek = false) {
@@ -107,7 +138,7 @@ export default function App() {
   // Before local data loads (and on the server) show the onboarding screen, so the page has real content for search engines.
   if (!ready) return <div className="preload"><Onboarding lang={lang} setLang={setLang} initial={null} onDone={() => {}} /></div>;
   if (!profile || !chart) {
-    return <Onboarding lang={lang} setLang={setLang} initial={null} onDone={(p) => { setProfile(p); save(K.profile, p); }} />;
+    return <Onboarding lang={lang} setLang={setLang} initial={null} account={account} providers={providers} onDone={(p) => { setProfile(p); save(K.profile, p); }} />;
   }
 
   return (
@@ -121,7 +152,7 @@ export default function App() {
         {tab === 'ask' && <Ask lang={lang} chart={chart} events={events} />}
         {tab === 'chart' && <ChartView lang={lang} chart={chart} profile={profile} onEdit={(p) => { setProfile(p); save(K.profile, p); }} />}
         {tab === 'settings' && (
-          <Settings lang={lang} setLang={setLang} ics={ics} setIcs={setIcs} chart={chart}
+          <Settings lang={lang} setLang={setLang} ics={ics} setIcs={setIcs} chart={chart} account={account} providers={providers}
             mail={mail} mailAddr={mailAddr} onEnableMail={enableMail} onCheckMail={() => checkMail()} onClearMail={() => setMail([])}
             onReset={() => { if (confirm(t.resetConfirm)) { Object.values(K).forEach((k) => localStorage.removeItem(k)); location.reload(); } }} />
         )}
@@ -140,7 +171,7 @@ export default function App() {
 
 // ---------------- onboarding ----------------
 
-function Onboarding({ lang, setLang, initial, onDone, onCancel }: { lang: Lang; setLang: (l: Lang) => void; initial: Profile | null; onDone: (p: Profile) => void; onCancel?: () => void }) {
+function Onboarding({ lang, setLang, initial, onDone, onCancel, account = null, providers = [] }: { lang: Lang; setLang: (l: Lang) => void; initial: Profile | null; onDone: (p: Profile) => void; onCancel?: () => void; account?: Account | null; providers?: string[] }) {
   const t = T[lang];
   const b = initial?.birth;
   const [name, setName] = useState(initial?.name ?? '');
@@ -181,6 +212,7 @@ function Onboarding({ lang, setLang, initial, onDone, onCancel }: { lang: Lang; 
           <button className={lang === 'zh' ? 'on' : ''} onClick={() => setLang('zh')}>中文</button>
         </div>
       </div>
+      {!initial && <div className="pad0"><AccountCard lang={lang} account={account} providers={providers} compact /></div>}
       <form className="card form" onSubmit={(e) => {
         e.preventDefault();
         if (!valid) return;
@@ -611,7 +643,7 @@ function ChartView({ lang, chart, profile, onEdit }: { lang: Lang; chart: Chart;
 
 // ---------------- settings ----------------
 
-function Settings({ lang, setLang, ics, setIcs, onReset, chart, mail, mailAddr, onEnableMail, onCheckMail, onClearMail }: { lang: Lang; setLang: (l: Lang) => void; ics: { url: string; events: CalEvent[]; at?: string } | null; setIcs: (v: { url: string; events: CalEvent[]; at?: string } | null) => void; onReset: () => void; chart: Chart; mail: MailItem[]; mailAddr: string | null; onEnableMail: () => Promise<void>; onCheckMail: () => Promise<number>; onClearMail: () => void }) {
+function Settings({ lang, setLang, ics, setIcs, onReset, chart, mail, mailAddr, onEnableMail, onCheckMail, onClearMail, account, providers }: { account: Account | null; providers: string[]; lang: Lang; setLang: (l: Lang) => void; ics: { url: string; events: CalEvent[]; at?: string } | null; setIcs: (v: { url: string; events: CalEvent[]; at?: string } | null) => void; onReset: () => void; chart: Chart; mail: MailItem[]; mailAddr: string | null; onEnableMail: () => Promise<void>; onCheckMail: () => Promise<number>; onClearMail: () => void }) {
   const t = T[lang];
   const [url, setUrl] = useState(ics?.url ?? '');
   const [state, setState] = useState<'idle' | 'busy' | 'error'>('idle');
@@ -624,6 +656,7 @@ function Settings({ lang, setLang, ics, setIcs, onReset, chart, mail, mailAddr, 
   return (
     <div className="stack">
       <h1>{t.settings}</h1>
+      <AccountCard lang={lang} account={account} providers={providers} />
       <section className="card">
         <div className="label">{t.language}</div>
         <div className="seg">
@@ -650,6 +683,43 @@ function Settings({ lang, setLang, ics, setIcs, onReset, chart, mail, mailAddr, 
       <button className="ghost danger" onClick={onReset}>{t.reset}</button>
       <Footer lang={lang} />
     </div>
+  );
+}
+
+// ---------------- account ----------------
+
+interface Account { name?: string; email?: string; image?: string }
+
+function ProviderIcon({ id }: { id: string }) {
+  if (id === 'google') return <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>;
+  return <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="#1877F2" d="M24 12a12 12 0 1 0-13.9 11.9v-8.4H7.1V12h3V9.4c0-3 1.8-4.7 4.5-4.7 1.3 0 2.7.2 2.7.2v2.9h-1.5c-1.5 0-2 .9-2 1.9V12h3.4l-.5 3.5h-2.9v8.4A12 12 0 0 0 24 12z"/></svg>;
+}
+
+function AccountCard({ lang, account, providers, compact = false }: { lang: Lang; account: Account | null; providers: string[]; compact?: boolean }) {
+  const t = T[lang];
+  if (account) {
+    return (
+      <section className="card row gap">
+        {account.image ? <img className="avatar" src={account.image} alt="" /> : null}
+        <div className="grow">
+          <div className="ev-title">{account.name || account.email}</div>
+          <div className="small muted">{t.signedInNote}</div>
+        </div>
+        {!compact && <button className="ghost" onClick={() => signOut({ redirectTo: '/' })}>{t.signOut}</button>}
+      </section>
+    );
+  }
+  if (!providers.length) return null;
+  return (
+    <section className={compact ? 'stack' : 'card stack'}>
+      {!compact && <div className="label">{t.account}</div>}
+      {providers.map((p) => (
+        <button key={p} className="social" onClick={() => signIn(p, { redirectTo: '/' })}>
+          <ProviderIcon id={p} /> {p === 'google' ? t.withGoogle : t.withFacebook}
+        </button>
+      ))}
+      <p className="small muted">{compact ? t.orNoAccount : t.signInWhy}</p>
+    </section>
   );
 }
 

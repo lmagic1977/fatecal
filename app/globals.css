@@ -171,3 +171,7 @@ a:focus-visible { outline: 2px solid var(--red); outline-offset: 3px; }
 .lg.neutral { background: var(--paper); border: 1px solid #CFC5B3; }
 .lg.bad { background: var(--red-bg); border: 1px solid var(--red-ink); }
 .lg.ev { background: var(--ink); border-radius: 6px; }
+.social { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; border: 1px solid #CFC5B3; border-radius: 10px; background: #fff; color: var(--ink); font-weight: 500; font-size: 15px; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; }
+.pad0 { margin: 0 20px 14px; }
+@media (min-width: 768px) { .pad0 { margin: 0 40px 14px; } }
