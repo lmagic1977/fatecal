@@ -261,52 +261,63 @@ function Landing({ lang, setLang, providers, onDone }: { lang: Lang; setLang: (l
   const l = t.lp;
   const [moved, setMoved] = useState(false);
   const [why, setWhy] = useState(false);
-  const go = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const go = (id: string) => {
+    const target = document.getElementById(id);
+    if (!target) return;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+  };
   return (
-    <div className="shell onboard">
+    <div className="shell onboard landing" lang={lang === 'zh' ? 'zh-CN' : 'en'}>
       <header className="top">
-        <Logo />
-        <button className="lang" onClick={() => setLang(lang === 'en' ? 'zh' : 'en')} aria-label="Switch language">{lang === 'en' ? '中文' : 'EN'}</button>
+        <div className="landing-brand"><img src="/icon.svg" alt="" width={34} height={34} />FateCal</div>
+        <button className="lang" onClick={() => setLang(lang === 'en' ? 'zh' : 'en')} aria-label={l.switchLanguage}>{lang === 'en' ? '中文' : 'EN'}</button>
       </header>
-      <div className="hero">
-        <div className="eyebrow">{l.eyebrow}</div>
-        <h1 className="display">{l.h1a}<br /><span>{l.h1b}</span></h1>
-        <p className="lead">{l.sub}</p>
-        <div className="row gap wrap">
-          <button className="primary" onClick={() => go('start')}>{l.start}</button>
-          <button className="ghost" onClick={() => go('demo')}>{l.tryIt}</button>
+      <div className="landing-hero">
+        <div className="hero">
+          <div className="eyebrow">{l.eyebrow}</div>
+          <h1 className="display">{l.h1a} <span>{l.h1b}</span></h1>
+          <p className="lead">{l.sub}</p>
+          <div className="row gap wrap">
+            <button className="primary" onClick={() => go('demo')}>{l.tryIt}</button>
+            <button className="ghost" onClick={() => go('start')}>{l.start}</button>
+          </div>
+          <p className="demo-note">{l.tryNote}</p>
         </div>
-        <p className="tiny">{l.tryNote}</p>
-      </div>
 
-      <section id="demo" className="demo" aria-label={l.demoLabel}>
-        <div className="tiny demo-k">{l.demoLabel}</div>
-        <div className="demo-card">
-          <div className="row between"><b>{l.week}</b></div>
-          <div className="wk">
-            {l.days.map((d, i) => <span key={d} className={(!moved && i === 1) || (moved && i === 3) ? 'on' : ''}>{d}</span>)}
+        <section id="demo" className="demo" aria-label={l.demoLabel} tabIndex={-1}>
+          <div className="demo-heading">
+            <div className="eyebrow">{l.demoLabel}</div>
+            <h2>{l.week}</h2>
           </div>
-          <div className="row between top-align demo-ev">
-            <div>
-              <div className="tiny">{moved ? l.recTime : l.evTime}</div>
-              <div className="ev-title">{l.evTitle}</div>
+          <div className="demo-card">
+            <div className="wk">
+              {l.days.map((day, index) => {
+                const selected = index === (moved ? 4 : 1);
+                return <div key={day} className={selected ? 'on' : ''} aria-current={selected ? 'date' : undefined}><span>{day}</span><b>{19 + index}</b></div>;
+              })}
             </div>
-            <span className={`tag ${moved ? 'good' : 'bad'}`}>{moved ? t.good : l.evBad}</span>
-          </div>
-          {!moved ? (
-            <>
-              <div className="rec row between"><div><div className="tiny">{l.recLabel}</div><b>{l.recTime}</b></div><b>76</b></div>
-              <div className="row gap">
-                <button className="primary" onClick={() => { setMoved(true); setWhy(false); }}>{l.moveBtn}</button>
-                <button className="link" onClick={() => setWhy(!why)} aria-expanded={why}>{l.why}</button>
+            <div className="row between top-align demo-ev" aria-live="polite">
+              <div>
+                <div className="demo-time">{moved ? l.recTime : l.evTime}</div>
+                <div className="ev-title">{l.evTitle}</div>
               </div>
-            </>
-          ) : (
-            <div className="row gap"><span className="small grow" aria-live="polite">{l.moved}</span><button className="link" onClick={() => setMoved(false)}>{l.undo}</button></div>
-          )}
-          {why && !moved && <p className="small muted">{l.whyText}</p>}
-        </div>
-      </section>
+              <span className={`tag ${moved ? 'good' : 'bad'}`}>{moved ? l.rescheduled : l.evBad}</span>
+            </div>
+            <div className="rec">
+              <div className="demo-time">{moved ? l.previousTime : l.recLabel}</div>
+              <b>{moved ? l.evTime : l.recTime}</b>
+            </div>
+            <div className="row gap wrap demo-actions">
+              <button className="primary" onClick={() => setMoved(!moved)}>{moved ? l.undo : l.moveBtn}</button>
+              <button className="link" onClick={() => setWhy(!why)} aria-expanded={why} aria-controls="demo-reason">
+                <span className="demo-trigram" aria-hidden="true"><i /><i /><i /></span>{l.why}
+              </button>
+            </div>
+            <p id="demo-reason" className="demo-reason" hidden={!why}>{l.whyText}</p>
+          </div>
+        </section>
+      </div>
 
       <section className="feats">
         {([[l.f1k, l.f1h, l.f1p], [l.f2k, l.f2h, l.f2p], [l.f3k, l.f3h, l.f3p]] as string[][]).map(([k, h, p]) => (
@@ -325,7 +336,7 @@ function Landing({ lang, setLang, providers, onDone }: { lang: Lang; setLang: (l
         {l.faq.map(([q, a]) => <details key={q}><summary>{q}</summary><p className="small muted">{a}</p></details>)}
       </section>
 
-      <section id="start" className="startform">
+      <section id="start" className="startform" tabIndex={-1}>
         <h2 className="display sm">{l.formH}</h2>
         <p className="small muted">{l.formP}</p>
         <div className="seg">
