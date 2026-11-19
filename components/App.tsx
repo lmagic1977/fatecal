@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BirthInput, CalEvent, Category, Chart, computeChart, readEvent, scoreDay, dayActivities, activityName, STEM, BRANCH, ELEMENT_NAME, Element, HIDDEN,
 } from '@/lib/engine';
@@ -13,7 +13,7 @@ import type { MailItem } from '@/lib/mail';
 
 interface Profile { name: string; birth: BirthInput; place: string }
 type Tab = 'today' | 'ask' | 'chart' | 'settings';
-interface Msg { role: 'user' | 'assistant'; text: string }
+interface Msg { role: 'user' | 'assistant'; text: string; image?: string }
 
 const K = { profile: 'fatecal.profile', events: 'fatecal.events', ics: 'fatecal.ics', lang: 'fatecal.lang', mailKey: 'fatecal.mailkey', mailAddr: 'fatecal.mailaddr', mail: 'fatecal.mail' };
 
@@ -232,6 +232,8 @@ function Today({ lang, chart, events, manual, setManual }: { lang: Lang; chart: 
         <button className="icon" onClick={() => shift(1)} aria-label={t.nextDay}>›</button>
       </div>
 
+      <MonthCal lang={lang} chart={chart} events={events} day={day} setDay={setDay} />
+
       <section className="dark card">
         <div className="ring"><b>{summary.score}</b><span>{t.dayScore}</span></div>
         <div className="grow">
@@ -271,6 +273,53 @@ function Today({ lang, chart, events, manual, setManual }: { lang: Lang; chart: 
       ))}
       <ShoppingResources lang={lang} />
     </div>
+  );
+}
+
+// Month view: each date shows its overall reading, and a mark when something is scheduled.
+function MonthCal({ lang, chart, events, day, setDay }: { lang: Lang; chart: Chart; events: CalEvent[]; day: Date; setDay: (d: Date) => void }) {
+  const t = T[lang];
+  const [open, setOpen] = useState(true);
+  const y = day.getFullYear(), m = day.getMonth();
+  const first = new Date(y, m, 1);
+  const days = new Date(y, m + 1, 0).getDate();
+  const verdicts = useMemo(() => Array.from({ length: days }, (_, i) => scoreDay(chart, new Date(y, m, i + 1)).verdict), [chart, y, m, days]);
+  const counts = useMemo(() => {
+    const c: Record<number, number> = {};
+    for (const e of events) { const d = new Date(e.start); if (d.getFullYear() === y && d.getMonth() === m) c[d.getDate()] = (c[d.getDate()] ?? 0) + 1; }
+    return c;
+  }, [events, y, m]);
+  const today = new Date();
+  const week = lang === 'zh' ? ['日', '一', '二', '三', '四', '五', '六'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const cells: (number | null)[] = [...Array(first.getDay()).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
+  const title = first.toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US', { year: 'numeric', month: 'long' });
+  return (
+    <section className="card month">
+      <div className="row between">
+        <button className="icon sm" onClick={() => setDay(new Date(y, m - 1, 1))} aria-label={t.prevMonth}>‹</button>
+        <button className="link" onClick={() => setOpen(!open)} aria-expanded={open}>{title} {open ? '▴' : '▾'}</button>
+        <button className="icon sm" onClick={() => setDay(new Date(y, m + 1, 1))} aria-label={t.nextMonth}>›</button>
+      </div>
+      {open && (
+        <>
+          <div className="mgrid" role="grid">
+            {week.map((w, i) => <div key={`w${i}`} className="wd" aria-hidden="true">{w}</div>)}
+            {cells.map((d, i) => d === null ? <div key={`e${i}`} /> : (
+              <button key={d} role="gridcell"
+                className={`md ${verdicts[d - 1]} ${d === day.getDate() ? 'sel' : ''} ${sameDay(new Date(y, m, d), today) ? 'today' : ''}`}
+                onClick={() => setDay(new Date(y, m, d))}
+                aria-label={`${new Date(y, m, d).toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US', { month: 'long', day: 'numeric' })}, ${t[verdicts[d - 1]]}${counts[d] ? `, ${counts[d]} ${t.eventsWord}` : ''}`}>
+                <span className="n">{d}</span>
+                {counts[d] ? <span className="ev">{counts[d]}</span> : <span className="ev none" />}
+              </button>
+            ))}
+          </div>
+          <div className="legend small muted">
+            <span><i className="lg good" />{t.good}</span><span><i className="lg neutral" />{t.neutral}</span><span><i className="lg bad" />{t.bad}</span><span><i className="lg ev" />{t.hasEvents}</span>
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -362,26 +411,72 @@ function EventCard({ lang, chart, ev, all, onMove, onDelete }: { lang: Lang; cha
 
 // ---------------- ask ----------------
 
+// Shrink a photo in the browser before sending: max 1280px on the long side, JPEG.
+async function shrinkImage(file: File): Promise<{ media_type: string; data: string; preview: string }> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = url; });
+    const k = Math.min(1, 1280 / Math.max(img.width, img.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
+    const preview = c.toDataURL('image/jpeg', 0.85);
+    return { media_type: 'image/jpeg', data: preview.split(',')[1], preview };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 function Ask({ lang, chart, events }: { lang: Lang; chart: Chart; events: CalEvent[] }) {
   const t = T[lang];
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
+  const [photo, setPhoto] = useState<{ media_type: string; data: string; preview: string } | null>(null);
+  const [listening, setListening] = useState(false);
+  const [voiceOk, setVoiceOk] = useState(false);
+  const recRef = useRef<any>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setVoiceOk(!!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)); }, []);
+
+  function toggleVoice() {
+    if (listening) { recRef.current?.stop(); return; }
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    const rec = new SR();
+    rec.lang = lang === 'zh' ? 'zh-CN' : 'en-US';
+    rec.interimResults = true;
+    rec.continuous = false;
+    const base = q ? q + ' ' : '';
+    rec.onresult = (e: any) => { let txt = ''; for (const r of e.results) txt += r[0].transcript; setQ((base + txt).slice(0, 500)); };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    recRef.current = rec;
+    setListening(true);
+    rec.start();
+  }
 
   async function send(question: string) {
-    if (!question.trim() || busy) return;
+    if ((!question.trim() && !photo) || busy) return;
     const history = msgs;
-    setMsgs([...history, { role: 'user', text: question }, { role: 'assistant', text: '' }]);
+    const pic = photo;
+    setMsgs([...history, { role: 'user', text: question || (lang === 'zh' ? '帮我看看这张图' : 'What about this photo?'), image: pic?.preview }, { role: 'assistant', text: '' }]);
     setQ('');
+    setPhoto(null);
     setBusy(true);
     const put = (text: string) => setMsgs((m) => [...m.slice(0, -1), { role: 'assistant', text }]);
-    const fallback = (lead: string) => put(`${lead}\n\n${fallbackAnswer(chart, question, lang)}`);
+    const fallback = (lead: string) => put(pic && !question ? lead : `${lead}\n\n${fallbackAnswer(chart, question, lang)}`);
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 45000);
+    const timer = setTimeout(() => ctrl.abort(), 60000);
     try {
       const res = await fetch('/api/ask', {
         method: 'POST', headers: { 'content-type': 'application/json' }, signal: ctrl.signal,
-        body: JSON.stringify({ question, lang, history, context: buildContext(chart, events, question, lang) }),
+        body: JSON.stringify({
+          question, lang, history: history.map(({ role, text }) => ({ role, text })),
+          context: buildContext(chart, events, question, lang),
+          image: pic ? { media_type: pic.media_type, data: pic.data } : undefined,
+        }),
       });
       if (res.status === 503) fallback(t.offline);
       else if (res.status === 429) put(t.rateLimited);
@@ -416,16 +511,41 @@ function Ask({ lang, chart, events }: { lang: Lang; chart: Chart; events: CalEve
       {msgs.length === 0 && (
         <div className="stack">
           {t.examples.map((ex) => <button key={ex} className="example" onClick={() => send(ex)}>{ex}</button>)}
+          <button className="example" onClick={() => fileRef.current?.click()}>{t.photoExample}</button>
         </div>
       )}
       <div className="msgs">
-        {msgs.map((m, i) => (m.text ? <div key={i} className={`bubble ${m.role}`}>{m.text}</div> : null))}
+        {msgs.map((m, i) => (m.text || m.image ? (
+          <div key={i} className={`bubble ${m.role}`}>
+            {m.image && <img className="shot" src={m.image} alt={t.photoAlt} />}
+            {m.text}
+          </div>
+        ) : null))}
         {busy && !msgs.at(-1)?.text && <div className="bubble assistant muted" aria-live="polite"><span className="dots">{t.thinking}</span></div>}
       </div>
       <form className="composer" onSubmit={(e) => { e.preventDefault(); send(q); }}>
+        {photo && (
+          <div className="attach">
+            <img src={photo.preview} alt={t.photoAlt} />
+            <button type="button" className="x" onClick={() => setPhoto(null)} aria-label={t.removePhoto}>×</button>
+          </div>
+        )}
+        <input ref={fileRef} type="file" accept="image/*" hidden onChange={async (e) => {
+          const f = e.target.files?.[0];
+          e.target.value = '';
+          if (f) { try { setPhoto(await shrinkImage(f)); } catch { /* unreadable image */ } }
+        }} />
+        <button type="button" className="iconbtn" onClick={() => fileRef.current?.click()} aria-label={t.addPhoto} disabled={busy}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="2.5" /><circle cx="12" cy="12.5" r="3.5" /><path d="M8.5 5l1.5-2h4l1.5 2" /></svg>
+        </button>
+        {voiceOk && (
+          <button type="button" className={`iconbtn ${listening ? 'live' : ''}`} onClick={toggleVoice} aria-label={listening ? t.stopVoice : t.voice} aria-pressed={listening} disabled={busy}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" /></svg>
+          </button>
+        )}
         <label className="sr" htmlFor="q">{t.askTitle}</label>
-        <input id="q" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t.askPlaceholder} maxLength={500} />
-        <button className="primary" disabled={busy || !q.trim()}>{t.send}</button>
+        <input id="q" value={q} onChange={(e) => setQ(e.target.value)} placeholder={listening ? t.listening : photo ? t.photoPlaceholder : t.askPlaceholder} maxLength={500} />
+        <button className="primary" disabled={busy || (!q.trim() && !photo)}>{t.send}</button>
       </form>
     </div>
   );
