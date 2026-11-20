@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { accessToken, loadToken, validKey } from '@/lib/gcal';
 import { needUser } from '@/lib/guard';
+import { currentUser } from '@/lib/guard';
+import { planFor } from '@/lib/billing';
+import { LIMITS } from '@/lib/plans';
+import { ACCOUNTS_ON } from '@/lib/site';
 
 export const runtime = 'nodejs';
 
@@ -8,6 +12,9 @@ export const runtime = 'nodejs';
 export async function POST(req: Request) {
   const denied = await needUser();
   if (denied) return denied;
+  const me = ACCOUNTS_ON ? await currentUser() : null;
+  const allowed = !me || LIMITS[await planFor(me)].syncCalendar;
+  if (!allowed) return NextResponse.json({ connected: false, locked: true });
   const { key } = await req.json().catch(() => ({}));
   if (!validKey(key)) return NextResponse.json({ error: 'bad_key' }, { status: 400 });
   const s = await loadToken(key);

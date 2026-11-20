@@ -1,6 +1,10 @@
 import ical from 'node-ical';
 import { NextResponse } from 'next/server';
 import { needUser } from '@/lib/guard';
+import { currentUser } from '@/lib/guard';
+import { planFor } from '@/lib/billing';
+import { LIMITS } from '@/lib/plans';
+import { ACCOUNTS_ON } from '@/lib/site';
 
 export const runtime = 'nodejs';
 
@@ -19,6 +23,9 @@ function allowed(raw: string): URL | null {
 export async function POST(req: Request) {
   const denied = await needUser();
   if (denied) return denied;
+  const me = ACCOUNTS_ON ? await currentUser() : null;
+  const paid = !me || LIMITS[await planFor(me)].syncCalendar;
+  if (!paid) return NextResponse.json({ error: 'upgrade', feature: 'calendar' }, { status: 402 });
   const { url, days = 14 } = await req.json().catch(() => ({}));
   const u = typeof url === 'string' ? allowed(url) : null;
   if (!u) return NextResponse.json({ error: 'invalid_url' }, { status: 400 });

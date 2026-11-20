@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BirthInput, CalEvent, Category, Chart, computeChart, readEvent, scoreDay, dayActivities, activityName, STEM, BRANCH, ELEMENT_NAME, Element, HIDDEN,
 } from '@/lib/engine';
@@ -11,6 +11,24 @@ import { signIn, signOut } from 'next-auth/react';
 import ShoppingResources from '@/components/ShoppingResources';
 import { CONTACT_EMAIL, ACCOUNTS_ON } from '@/lib/site';
 import type { MailItem } from '@/lib/mail';
+import { LIMITS, PRICES, TRIAL_DAYS, money, type Interval, type Limits, type Plan } from '@/lib/plans';
+
+// ---------------- billing ----------------
+interface BillInfo { plan: Plan; limits: Limits; billing: boolean; premiumOpen: boolean; status?: string; interval?: Interval; periodEnd?: string; trialEnd?: string; cancelAtPeriodEnd?: boolean; trialAvailable?: boolean; hasCustomer?: boolean; askedToday?: number }
+const FREE_INFO: BillInfo = { plan: 'free', limits: LIMITS.free, billing: false, premiumOpen: false };
+const Bill = createContext<{ info: BillInfo; upgrade: (plan?: 'basic' | 'premium', interval?: Interval) => void; manage: () => void; refresh: () => void }>({ info: FREE_INFO, upgrade: () => {}, manage: () => {}, refresh: () => {} });
+const useBill = () => useContext(Bill);
+
+function Locked({ lang, text }: { lang: Lang; text: string }) {
+  const { upgrade } = useBill();
+  const b = T[lang].bill;
+  return (
+    <div className="locked">
+      <span>🔒 {text}</span>
+      <button className="link" onClick={() => upgrade('basic')}>{b.upgrade(b.basic)} →</button>
+    </div>
+  );
+}
 import { Sex, Dir, DIRS, DIR_NAME, DIR_ELEMENT, STAR8, FLY, kuaOf, annualStars, liChunYear, yearGanZhi, readHome, dirFromDegrees } from '@/lib/fengshui';
 
 interface Profile { name: string; birth: BirthInput; place: string; sex?: Sex }
@@ -19,7 +37,7 @@ type Pic = { media_type: string; data: string; preview: string };
 interface Seed { q: string; photo?: Pic }
 // the Li Chun year of birth, which feng shui uses (births before about Feb 4 count as the previous year)
 const birthFsYear = (b: BirthInput) => liChunYear(new Date(b.year, b.month - 1, b.day, b.hourUnknown ? 12 : b.hour, b.hourUnknown ? 0 : b.minute));
-interface Msg { role: 'user' | 'assistant'; text: string; image?: string }
+interface Msg { role: 'user' | 'assistant'; text: string; image?: string; upsell?: boolean }
 
 const K = { owner: 'fatecal.owner', profile: 'fatecal.profile', events: 'fatecal.events', ics: 'fatecal.ics', lang: 'fatecal.lang', mailKey: 'fatecal.mailkey', mailAddr: 'fatecal.mailaddr', mail: 'fatecal.mail', mailEdits: 'fatecal.mailedits', gcalKey: 'fatecal.gcalkey', gcal: 'fatecal.gcal' };
 
@@ -65,6 +83,8 @@ export default function App() {
   // Google Calendar (read-only): the browser's key, and the last events we read
   const [gcalKey, setGcalKey] = useState<string | null>(null);
   const [gcal, setGcal] = useState<GcalState | null>(null);
+  const [bill, setBill] = useState<BillInfo>(FREE_INFO);
+  const [billNote, setBillNote] = useState('');
   const [mailUsage, setMailUsage] = useState<{ used: number; limit: number } | null>(null);
   const [authed, setAuthed] = useState<'checking' | 'out' | 'in'>('checking');
   const synced = useRef(false);
@@ -106,6 +126,26 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
   const [gcalNote, setGcalNote] = useState('');
+  const loadBill = () => fetch('/api/billing/me').then((r) => (r.ok ? r.json() : null)).then((j) => { if (j) setBill({ ...FREE_INFO, ...j }); }).catch(() => {});
+  useEffect(() => {
+    if (!ready || authed !== 'in') return;
+    loadBill();
+    const r = new URLSearchParams(location.search).get('billing');
+    if (r) { history.replaceState(null, '', location.pathname); setTab('settings'); setBillNote(r); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, authed]);
+  async function upgrade(plan: 'basic' | 'premium' = 'basic', interval: Interval = 'month') {
+    const r = await fetch('/api/billing/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan, interval, lang }) }).catch(() => null);
+    const j = r ? await r.json().catch(() => null) : null;
+    if (j?.url) { location.href = j.url; return; }
+    if (r?.status === 409) { manage(); return; }
+    setTab('settings'); setBillNote('unavailable');
+  }
+  async function manage() {
+    const r = await fetch('/api/billing/portal', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ lang }) }).catch(() => null);
+    const j = r ? await r.json().catch(() => null) : null;
+    if (j?.url) location.href = j.url; else setBillNote('unavailable');
+  }
 
   // Accounts: when signed in, the chart, events and settings are kept on the server and follow the user.
   useEffect(() => {
@@ -208,6 +248,7 @@ export default function App() {
 
   const v2 = t.v2;
   return (
+    <Bill.Provider value={{ info: bill, upgrade, manage, refresh: loadBill }}>
     <div className="desk">
     <aside className="desk-side">
       <Logo big />
@@ -227,7 +268,7 @@ export default function App() {
         {tab === 'home' && <FengShui lang={lang} chart={chart} profile={profile} setSex={(sx) => { const p = { ...profile, sex: sx }; setProfile(p); save(K.profile, p); }} ask={(sd) => { setSeed(sd); setTab('ask'); }} />}
         {tab === 'chart' && <ChartView lang={lang} chart={chart} profile={profile} onEdit={(p) => { setProfile(p); save(K.profile, p); }} />}
         {tab === 'settings' && (
-          <Settings lang={lang} setLang={setLang} ics={ics} setIcs={setIcs}
+          <Settings lang={lang} setLang={setLang} ics={ics} setIcs={setIcs} billNote={billNote}
             gcal={gcal} gcalNote={gcalNote}
             onGcalConnect={() => { let k = gcalKey; if (!k) { k = crypto.randomUUID(); save(K.gcalKey, k); setGcalKey(k); } location.href = `/api/gcal/start?key=${encodeURIComponent(k)}`; }}
             onGcalRefresh={() => refreshGcal()}
@@ -246,6 +287,7 @@ export default function App() {
       </nav>
     </div>
     </div>
+    </Bill.Provider>
   );
 }
 
@@ -513,6 +555,7 @@ function ScoreRing({ score, label }: { score: number; label: string }) {
 function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove }: { lang: Lang; chart: Chart; events: CalEvent[]; manual: CalEvent[]; setManual: (e: CalEvent[]) => void; name: string; onMove: (e: CalEvent, s: string, en: string) => void; onRemove: (e: CalEvent) => void }) {
   const t = T[lang];
   const v = t.v2;
+  const limits = useBill().info.limits;
   const [day, setDay] = useState(() => new Date());
   const [adding, setAdding] = useState(false);
   const [toast, setToast] = useState('');
@@ -616,7 +659,11 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
           onDelete={() => { if (e.source !== 'email' || confirm(t.v2.removeMailConfirm)) onRemove(e); }} />
       ))}
       <button className="addbig" onClick={() => setAdding(true)}>+ {v.addOrConnect}</button>
-      {adding && <AddEvent lang={lang} day={day} onSave={(e) => { setManual([...manual, e]); setAdding(false); }} onCancel={() => setAdding(false)} />}
+      {adding && <AddEvent lang={lang} day={day} onSave={(e) => {
+        const sameDate = manual.filter((m) => sameDay(new Date(m.start), new Date(e.start))).length;
+        if (sameDate >= limits.manualPerDay) { setAdding(false); flash(t.bill.addLimit(limits.manualPerDay)); return; }
+        setManual([...manual, e]); setAdding(false);
+      }} onCancel={() => setAdding(false)} />}
       {toast && <div className="toast" role="status">{toast}</div>}
       <ShoppingResources lang={lang} />
     </div>
@@ -738,7 +785,8 @@ function EventCard({ lang, chart, ev, all, onMove, onDelete }: { lang: Lang; cha
     : lang === 'zh'
       ? { a: `${st.getHours()}:${pad(st.getMinutes())}`, b: st.getHours() < 12 ? '上午' : '下午' }
       : { a: `${((st.getHours() + 11) % 12) + 1}:${pad(st.getMinutes())}`, b: st.getHours() < 12 ? 'AM' : 'PM' };
-  const showMove = !ev.allDay && !!alt && r.verdict !== 'good';
+  const full = useBill().info.limits.fullReasons;
+  const showMove = full && !ev.allDay && !!alt && r.verdict !== 'good';
 
   return (
     <article className={`card event ${r.verdict === 'bad' ? 'warn' : ''}`}>
@@ -759,10 +807,11 @@ function EventCard({ lang, chart, ev, all, onMove, onDelete }: { lang: Lang; cha
         {showMove && (ev.source !== 'calendar'
           ? <button className="primary" onClick={() => onMove(alt.start, alt.end)}>⇢ {sameD ? v.moveTo : v.tryDay} {altLabel} ({alt.score})</button>
           : <button className="primary" onClick={() => { navigator.clipboard?.writeText(note); setCopied(true); }}>{copied ? t.copied : `${t.copyNote} · ${altLabel}`}</button>)}
-        <button className="softbtn" onClick={() => setWhy(!why)} aria-expanded={why}>{why ? t.hide : t.why}</button>
+        {full && <button className="softbtn" onClick={() => setWhy(!why)} aria-expanded={why}>{why ? t.hide : t.why}</button>}
         {ev.source === 'email' && showMove && <button className="link" onClick={() => { navigator.clipboard?.writeText(note); setCopied(true); }}>{copied ? t.copied : t.copyNote}</button>}
         {ev.source !== 'calendar' && <button className="link danger" onClick={onDelete}>{t.del}</button>}
       </div>
+      {!full && r.verdict !== 'good' && <Locked lang={lang} text={t.bill.lockedWhy} />}
       {showMove && ev.source === 'calendar' && <p className="tiny">{t.calendarNote}</p>}
       {ev.source === 'email' && showMove && <p className="tiny">{v.mailMoveNote}</p>}
       {why && (
@@ -797,6 +846,7 @@ async function shrinkImage(file: File): Promise<{ media_type: string; data: stri
 
 function Ask({ lang, chart, events, profile, seed, clearSeed }: { lang: Lang; chart: Chart; events: CalEvent[]; profile: Profile; seed: Seed | null; clearSeed: () => void }) {
   const t = T[lang];
+  const bill = useBill();
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
@@ -855,7 +905,11 @@ function Ask({ lang, chart, events, profile, seed, clearSeed }: { lang: Lang; ch
         }),
       });
       if (res.status === 503) fallback(t.offline);
-      else if (res.status === 429) put(t.rateLimited);
+      else if (res.status === 429 || res.status === 402) {
+        const j = await res.json().catch(() => null);
+        const text = j?.error === 'daily_limit' ? t.bill.askLimit(j.limit) : j?.feature === 'photos' ? t.bill.photoLocked : t.rateLimited;
+        setMsgs((m) => [...m.slice(0, -1), { role: 'assistant', text, upsell: j?.error === 'daily_limit' || j?.feature === 'photos' }]);
+      }
       else if (!res.ok || !res.body) fallback(t.aiError);
       else {
         const reader = res.body.getReader();
@@ -889,7 +943,8 @@ function Ask({ lang, chart, events, profile, seed, clearSeed }: { lang: Lang; ch
           <div key={i} className={`bubble ${m.role}`}>
             {m.image && <img className="shot" src={m.image} alt={t.photoAlt} />}
             {m.text}
-            {m.role === 'assistant' && !(busy && i === msgs.length - 1) && (
+            {m.upsell && <div style={{ marginTop: 8 }}><button className="primary" onClick={() => bill.upgrade('basic')}>{t.bill.upgrade(t.bill.basic)}</button></div>}
+            {m.role === 'assistant' && !m.upsell && !(busy && i === msgs.length - 1) && (
               <div className="basis" aria-label={t.v2.basis}>
                 <span>{t.v2.basisChart}</span><span>{t.v2.basisDay}</span>
                 {events.length > 0 && <span>{t.v2.basisCal}</span>}
@@ -942,6 +997,8 @@ const amazon = (q: string) => `https://www.amazon.com/s?k=${encodeURIComponent(q
 function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Chart; profile: Profile; setSex: (s: Sex) => void; ask: (s: Seed) => void }) {
   const t = T[lang];
   const f = t.fs;
+  const nextOk = useBill().info.limits.nextYearStars;
+  const [yearLocked, setYearLocked] = useState(false);
   const zh = lang === 'zh';
   const dn = (d: Dir) => (zh ? DIR_NAME[d].zh : DIR_NAME[d].en);
   const el = (e: Element) => (zh ? ELEMENT_NAME[e].zh : ELEMENT_NAME[e].en);
@@ -1028,9 +1085,10 @@ function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Ch
           <div className="label">{f.stars}</div>
           <div className="seg sm">
             <button className={yr === thisYear ? 'on' : ''} onClick={() => { setYr(thisYear); setCell(null); }}>{thisYear}</button>
-            <button className={yr === thisYear + 1 ? 'on' : ''} onClick={() => { setYr(thisYear + 1); setCell(null); }}>{thisYear + 1}</button>
+            <button className={yr === thisYear + 1 ? 'on' : ''} onClick={() => { if (!nextOk) { setYearLocked(true); return; } setYr(thisYear + 1); setCell(null); }}>{nextOk ? '' : '🔒 '}{thisYear + 1}</button>
           </div>
         </div>
+        {yearLocked && !nextOk && <Locked lang={lang} text={t.bill.lockedYear} />}
         <p className="small muted">{f.starsIntro} {zh ? `${yr}年 ${yearGanZhi(yr)}，` : `${yr} (${yearGanZhi(yr)}), `}{f.starsFrom}</p>
         <div className="fsgrid" role="grid">
           {GRID.map((g) => {
@@ -1211,7 +1269,7 @@ function ChartView({ lang, chart, profile, onEdit }: { lang: Lang; chart: Chart;
 
 // ---------------- settings ----------------
 
-function Settings({ lang, setLang, ics, setIcs, gcal, gcalNote, onGcalConnect, onGcalRefresh, onGcalDisconnect, onReset, chart, mail, mailAddr, mailUsage, onEnableMail, onCheckMail, onClearMail, account, providers }: { gcal: GcalState | null; gcalNote: string; onGcalConnect: () => void; onGcalRefresh: () => Promise<boolean>; onGcalDisconnect: () => Promise<void>; account: Account | null; providers: string[]; lang: Lang; setLang: (l: Lang) => void; ics: { url: string; events: CalEvent[]; at?: string } | null; setIcs: (v: { url: string; events: CalEvent[]; at?: string } | null) => void; onReset: () => void; chart: Chart; mail: MailItem[]; mailAddr: string | null; mailUsage: { used: number; limit: number } | null; onEnableMail: () => Promise<void>; onCheckMail: () => Promise<number>; onClearMail: () => void }) {
+function Settings({ lang, setLang, ics, setIcs, billNote, gcal, gcalNote, onGcalConnect, onGcalRefresh, onGcalDisconnect, onReset, chart, mail, mailAddr, mailUsage, onEnableMail, onCheckMail, onClearMail, account, providers }: { billNote: string; gcal: GcalState | null; gcalNote: string; onGcalConnect: () => void; onGcalRefresh: () => Promise<boolean>; onGcalDisconnect: () => Promise<void>; account: Account | null; providers: string[]; lang: Lang; setLang: (l: Lang) => void; ics: { url: string; events: CalEvent[]; at?: string } | null; setIcs: (v: { url: string; events: CalEvent[]; at?: string } | null) => void; onReset: () => void; chart: Chart; mail: MailItem[]; mailAddr: string | null; mailUsage: { used: number; limit: number } | null; onEnableMail: () => Promise<void>; onCheckMail: () => Promise<number>; onClearMail: () => void }) {
   const t = T[lang];
   const [url, setUrl] = useState(ics?.url ?? '');
   const [state, setState] = useState<'idle' | 'busy' | 'error'>('idle');
@@ -1221,10 +1279,12 @@ function Settings({ lang, setLang, ics, setIcs, gcal, gcalNote, onGcalConnect, o
     const j = res && res.ok ? await res.json() : null;
     if (j?.events) { setIcs({ url, events: j.events, at: new Date().toISOString() }); setState('idle'); } else setState('error');
   }
+  const calOk = useBill().info.limits.syncCalendar;
   return (
     <div className="stack">
       <h1>{t.settings}</h1>
       <AccountCard lang={lang} account={account} providers={providers} />
+      {ACCOUNTS_ON && <PlanCard lang={lang} note={billNote} />}
       <section className="card">
         <div className="label">{t.language}</div>
         <div className="seg">
@@ -1234,7 +1294,8 @@ function Settings({ lang, setLang, ics, setIcs, gcal, gcalNote, onGcalConnect, o
       </section>
       <section className="card form">
         <div className="label">{t.calendar}</div>
-        <GcalCard lang={lang} gcal={gcal} note={gcalNote} onConnect={onGcalConnect} onRefresh={onGcalRefresh} onDisconnect={onGcalDisconnect} />
+        {!calOk ? <Locked lang={lang} text={t.bill.lockedCal} /> : <GcalCard lang={lang} gcal={gcal} note={gcalNote} onConnect={onGcalConnect} onRefresh={onGcalRefresh} onDisconnect={onGcalDisconnect} />}
+        {calOk && <>
         <div className="orline small muted">{t.gc.orPaste}</div>
         <label>{t.icsLabel}<input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" inputMode="url" /></label>
         <p className="muted small">{t.icsHelp}</p>
@@ -1247,12 +1308,64 @@ function Settings({ lang, setLang, ics, setIcs, gcal, gcalNote, onGcalConnect, o
           <button className="primary" disabled={!url || state === 'busy'} onClick={connect}>{state === 'busy' ? t.syncing : t.connect}</button>
         )}
         {state === 'error' && <p className="danger small">{t.icsError}</p>}
+        </>}
       </section>
       <MailSection lang={lang} chart={chart} mail={mail} mailAddr={mailAddr} usage={mailUsage} onEnable={onEnableMail} onCheck={onCheckMail} onClear={onClearMail} />
       <p className="muted small">{t.privacy}</p>
       <button className="ghost danger danger-btn" onClick={onReset}>{t.reset}</button>
       <Footer lang={lang} />
     </div>
+  );
+}
+
+function PlanCard({ lang, note }: { lang: Lang; note: string }) {
+  const { info, upgrade, manage } = useBill();
+  const b = T[lang].bill;
+  const [iv, setIv] = useState<Interval>('year');
+  const [busy, setBusy] = useState(false);
+  const d = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(tLocale(lang), { month: 'short', day: 'numeric', year: 'numeric' }) : '');
+  const msg = note === 'success' ? b.done : note === 'cancel' ? b.cancelled : note === 'unavailable' ? b.unavailable : '';
+  const tiers: { id: Plan; list: string[] }[] = [{ id: 'free', list: b.freeList }, { id: 'basic', list: b.basicList }, { id: 'premium', list: b.premiumList }];
+  return (
+    <section className="card stack planbox">
+      <div className="row between">
+        <div className="label">{b.plan}</div>
+        <span className={`planpill ${info.plan}`}>{b[info.plan]}</span>
+      </div>
+      {msg && <p className="small" role="status">{msg}</p>}
+      {info.plan !== 'free' && (
+        <>
+          <p className="small muted">
+            {info.status === 'trialing' && info.trialEnd ? b.trialEnds(d(info.trialEnd)) : info.cancelAtPeriodEnd ? b.ends(d(info.periodEnd)) : info.periodEnd ? b.renews(d(info.periodEnd)) : ''}
+          </p>
+          {info.hasCustomer && <button className="ghost" onClick={manage}>{b.manage}</button>}
+        </>
+      )}
+      {info.plan === 'free' && (
+        <>
+          <div className="seg sm">
+            <button className={iv === 'month' ? 'on' : ''} onClick={() => setIv('month')}>{b.monthly}</button>
+            <button className={iv === 'year' ? 'on' : ''} onClick={() => setIv('year')}>{b.yearly} · {b.save}</button>
+          </div>
+          <div className="tiers">
+            {tiers.map((tier) => {
+              const price = tier.id === 'free' ? null : PRICES[tier.id][iv];
+              const open = tier.id === 'basic' || (tier.id === 'premium' && info.premiumOpen);
+              return (
+                <div key={tier.id} className={`tier ${tier.id} ${tier.id === 'basic' ? 'hl' : ''}`}>
+                  <div className="row between"><b>{b[tier.id]}</b>{price ? <span><b>{money(price.cents)}</b><span className="tiny">{iv === 'month' ? b.perMonth : b.perYear}</span></span> : <b>$0</b>}</div>
+                  <ul>{tier.list.map((x) => <li key={x}>{x}</li>)}</ul>
+                  {tier.id !== 'free' && (open
+                    ? <button className="primary" disabled={busy} onClick={() => { setBusy(true); upgrade(tier.id as 'basic' | 'premium', iv); }}>{info.trialAvailable !== false ? b.trial(TRIAL_DAYS) : b.upgrade(b[tier.id])}</button>
+                    : <span className="tag neutral">{b.soon}</span>)}
+                </div>
+              );
+            })}
+          </div>
+          <p className="tiny">{b.trialNote} {b.cancelNote}</p>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -1335,6 +1448,9 @@ function MailSection({ lang, chart, mail, mailAddr, usage, onEnable, onCheck, on
   // a limit notice only matters in the month it arrived
   const thisMonth = new Date().toISOString().slice(0, 7);
   const limitHit = mail.some((m) => m.kind === 'limit' && m.receivedAt.slice(0, 7) === thisMonth) || (!!usage && usage.used > usage.limit);
+  if (!useBill().info.limits.mailForwarding) return (
+    <section className="card"><div className="label">{t.forwarding}</div><Locked lang={lang} text={t.bill.lockedMail} /></section>
+  );
   return (
     <section className="card form">
       <div className="label">{t.forwarding}</div>

@@ -24,6 +24,15 @@ export default function Terms() {
       <h2>Links and affiliate partners</h2>
       <p>FateCal may link to other sites, including affiliate partners. We are not responsible for their content, products, prices or policies, and purchases you make there are between you and them.</p>
 
+      <h2>Subscriptions</h2>
+      <p>FateCal has a free plan and paid plans (FateCal Basic, and later FateCal Premium), billed monthly or yearly in US dollars through Stripe. Prices and what each plan includes are shown in Settings before you pay.</p>
+      <ul>
+        <li><b>Free trial</b>: new subscribers get a {7}-day free trial once. You are not charged during the trial; we email you before it ends. If you cancel before the trial ends, you pay nothing.</li>
+        <li><b>Renewal</b>: a subscription renews automatically at the end of each month or year until you cancel. The price and date of the next charge are shown in Settings.</li>
+        <li><b>Cancelling</b>: cancel any time in Settings → Manage subscription. You keep your plan until the end of the period you already paid for; we do not charge again.</li>
+        <li><b>Refunds</b>: if you forgot to cancel and write to us at hello@fatecal.com within 7 days of a renewal you have not used, we will refund it. Other refunds are at our discretion and where the law requires.</li>
+        <li><b>Changes</b>: if we change a price, we tell you at least 30 days before it applies to your next renewal, and you can cancel before then.</li>
+      </ul>
       <h2>No warranty</h2>
       <p>FateCal is provided "as is" and "as available", without warranties of any kind, to the fullest extent the law allows.</p>
 

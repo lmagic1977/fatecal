@@ -4,6 +4,10 @@ import { INBOUND_DOMAIN, MailItem } from '@/lib/mail';
 import { addressToken, validReadKey } from '@/lib/mailkey';
 import { MONTHLY_LIMIT, readUsage } from '@/lib/quota';
 import { needUser } from '@/lib/guard';
+import { currentUser } from '@/lib/guard';
+import { planFor } from '@/lib/billing';
+import { LIMITS } from '@/lib/plans';
+import { ACCOUNTS_ON } from '@/lib/site';
 
 export const runtime = 'nodejs';
 
@@ -11,6 +15,9 @@ export const runtime = 'nodejs';
 export async function POST(req: Request) {
   const denied = await needUser();
   if (denied) return denied;
+  const me = ACCOUNTS_ON ? await currentUser() : null;
+  const allowed = !me || LIMITS[await planFor(me)].mailForwarding;
+  if (!allowed) return NextResponse.json({ error: 'upgrade', feature: 'mail', items: [] }, { status: 402 });
   const { key, peek } = await req.json().catch(() => ({}));
   if (!validReadKey(key)) return NextResponse.json({ error: 'bad_key' }, { status: 400 });
   let token: string;

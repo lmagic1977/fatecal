@@ -9,3 +9,10 @@ export async function needUser(): Promise<NextResponse | null> {
   const s = await auth().catch(() => null);
   return (s as any)?.uid ? null : NextResponse.json({ error: 'sign_in_required' }, { status: 401 });
 }
+
+// The signed-in account (uid and email), or null.
+export async function currentUser(): Promise<{ uid: string; email?: string } | null> {
+  const s = await auth().catch(() => null);
+  const uid = (s as any)?.uid;
+  return uid ? { uid, email: s?.user?.email ?? undefined } : null;
+}

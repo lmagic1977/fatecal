@@ -1,6 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NextResponse } from 'next/server';
-import { needUser } from '@/lib/guard';
+import { currentUser, needUser } from '@/lib/guard';
+import { bumpUsage, planFor, readUsageCount } from '@/lib/billing';
+import { LIMITS } from '@/lib/plans';
+import { ACCOUNTS_ON } from '@/lib/site';
 
 export const runtime = 'nodejs';
 
@@ -51,6 +54,15 @@ export async function POST(req: Request) {
   const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
   const lang = body.lang === 'zh' ? 'zh' : 'en';
   const img = body.image && typeof body.image.data === 'string' && /^image\/(jpeg|png|webp|gif)$/.test(body.image.media_type) && body.image.data.length < 4_000_000 ? body.image : null;
+
+  // plan limits: photo questions and questions per day
+  const me = ACCOUNTS_ON ? await currentUser() : null;
+  if (me) {
+    const lim = LIMITS[await planFor(me)];
+    if (img && !lim.photos) return NextResponse.json({ error: 'upgrade', feature: 'photos' }, { status: 402 });
+    if ((await readUsageCount(me.uid, 'ask')) >= lim.askPerDay) return NextResponse.json({ error: 'daily_limit', limit: lim.askPerDay }, { status: 429 });
+    await bumpUsage(me.uid, 'ask');
+  }
 
   const client = new Anthropic({ apiKey: key });
   const messages: Anthropic.MessageParam[] = [
