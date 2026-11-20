@@ -130,6 +130,7 @@ export default function App() {
         if (d.icsUrl && !ics?.url) setIcs({ url: d.icsUrl, events: [] });
         if (d.lang) setLang(d.lang);
         if (d.mailKey && !mailKey) { save(K.mailKey, d.mailKey); setMailKey(d.mailKey); }
+        if (d.gcalKey && !gcalKey) { save(K.gcalKey, d.gcalKey); setGcalKey(d.gcalKey); refreshGcal(d.gcalKey); }
       }
       synced.current = true;
       setAuthed('in');
@@ -139,10 +140,10 @@ export default function App() {
   useEffect(() => {
     if (!ready || !account || !synced.current || !profile) return;
     const id = setTimeout(() => {
-      fetch('/api/sync', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ v: 1, updatedAt: new Date().toISOString(), profile, events: manual, icsUrl: ics?.url ?? null, lang, mailKey }) }).catch(() => {});
+      fetch('/api/sync', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ v: 1, updatedAt: new Date().toISOString(), profile, events: manual, icsUrl: ics?.url ?? null, lang, mailKey, gcalKey }) }).catch(() => {});
     }, 1500);
     return () => clearTimeout(id);
-  }, [ready, account, profile, manual, ics?.url, lang, mailKey]);
+  }, [ready, account, profile, manual, ics?.url, lang, mailKey, gcalKey]);
 
   // Fetch forwarded mail: on start, then every minute while the app is open.
   async function checkMail(key = mailKey, peek = false) {
