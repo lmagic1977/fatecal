@@ -377,16 +377,12 @@ function Onboarding({ lang, setLang, initial, onDone, onCancel, account = null, 
   if (embedded) return <>{form()}</>;
   return (
     <div className="shell onboard">
+      {!initial && <header className="top"><span /><LangMenu lang={lang} setLang={setLang} /></header>}
       {!initial && (
         <div className="hero">
           <Logo big />
           <h1>{t.welcome}{account?.name && !account.name.includes('@') && !account.name.includes('*') ? `, ${account.name}` : ''}</h1>
           <p className="muted">{t.profileIntro}</p>
-          <div className="seg">
-            <button className={lang === 'en' ? 'on' : ''} onClick={() => setLang('en')}>English</button>
-            <button className={lang === 'zh' ? 'on' : ''} onClick={() => setLang('zh')}>中文</button>
-            <button className={lang === 'es' ? 'on' : ''} onClick={() => setLang('es')}>Español</button>
-          </div>
         </div>
       )}
       {form()}
@@ -402,12 +398,18 @@ function Logo({ big = false }: { big?: boolean }) {
   return <img className={big ? 'logo big' : 'logo'} src="/logo.svg" alt="FateCal" width={big ? 172 : 115} height={big ? 42 : 28} />;
 }
 
-// Header language picker
+// Language picker, top right on every screen: 🌐 + the current language + ▾ (native menu, so it works well on phones)
+const LANGS: { id: Lang; name: string }[] = [{ id: 'en', name: 'English' }, { id: 'zh', name: '中文' }, { id: 'es', name: 'Español' }];
 function LangMenu({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void }) {
   return (
-    <select className="lang langsel" value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label="Language / 语言 / Idioma">
-      <option value="en">EN</option><option value="zh">中文</option><option value="es">ES</option>
-    </select>
+    <label className="langpick">
+      <span aria-hidden="true">🌐</span>
+      <span className="langname">{LANGS.find((x) => x.id === lang)?.name}</span>
+      <span aria-hidden="true" className="caret">▾</span>
+      <select value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label="Language / 语言 / Idioma">
+        {LANGS.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+      </select>
+    </label>
   );
 }
 
