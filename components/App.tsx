@@ -74,7 +74,10 @@ export default function App({ initialLang = "en" }: { initialLang?: Lang }) {
   const [lang, setLangState] = useState<Lang>(initialLang);
   // null = follow the phone/computer language; 'en' | 'zh' = the person chose it (kept and synced)
   const [langPick, setLangPick] = useState<Lang | null>(null);
-  useEffect(() => { document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang; }, [lang]);
+  useEffect(() => {
+    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang;
+    document.title = lang === 'zh' ? '随身命历 FateCal：给重要的事，挑个好时间' : lang === 'es' ? 'FateCal: tu asesor BaZi para la vida real' : 'FateCal: your BaZi advisor for real life';
+  }, [lang]);
   const setLang = (l: Lang) => { setLangState(l); setLangPick(l); save(K.langPick, l); };
   const [profile, setProfile] = useState<Profile | null>(null);
   const [manual, setManual] = useState<CalEvent[]>([]);
@@ -285,7 +288,7 @@ export default function App({ initialLang = "en" }: { initialLang?: Lang }) {
   // Everyone signs up first (Google, Facebook, email or phone), then fills in their birth details.
   if (!ready) return <div className="preload"><Landing lang={lang} setLang={setLang} providers={[]} onDone={() => {}} /></div>;
   if (!ACCOUNTS_ON && (!profile || !chart)) return <Landing lang={lang} setLang={setLang} providers={[]} onDone={(p) => { setProfile(p); save(K.profile, p); }} />;
-  if (ACCOUNTS_ON && authed === 'checking') return <div className="shell onboard"><div className="hero"><Logo big /><p className="muted" aria-live="polite">{t.loading}</p></div></div>;
+  if (ACCOUNTS_ON && authed === 'checking') return <div className="shell onboard"><div className="hero"><Logo big lang={lang} /><p className="muted" aria-live="polite">{t.loading}</p></div></div>;
   if (ACCOUNTS_ON && authed === 'out') return <Landing lang={lang} setLang={setLang} providers={providers} onDone={() => {}} />;
   if (!profile || !chart) {
     return <Onboarding lang={lang} setLang={setLang} initial={null} account={account} onDone={(p) => { setProfile(p); save(K.profile, p); }} />;
@@ -296,7 +299,7 @@ export default function App({ initialLang = "en" }: { initialLang?: Lang }) {
     <Bill.Provider value={{ info: bill, upgrade, manage, refresh: loadBill }}>
     <div className="desk">
     <aside className="desk-side">
-      <Logo big />
+      <Logo big lang={lang} />
       <h1>{v2.deskH1a} <em>{v2.deskEm}</em> {v2.deskH1b}</h1>
       <p className="lead">{v2.deskLead}</p>
       <ul>{v2.deskPts.map(([em, h, p]) => <li key={h}>{em} <b>{h}</b>: {p}</li>)}</ul>
@@ -304,7 +307,7 @@ export default function App({ initialLang = "en" }: { initialLang?: Lang }) {
     </aside>
     <div className="shell">
       <header className="top">
-        <Logo />
+        <Logo lang={lang} />
         <LangMenu lang={lang} setLang={setLang} />
       </header>
       <main className="main">
@@ -380,7 +383,7 @@ function Onboarding({ lang, setLang, initial, onDone, onCancel, account = null, 
       {!initial && <header className="top"><span /><LangMenu lang={lang} setLang={setLang} /></header>}
       {!initial && (
         <div className="hero">
-          <Logo big />
+          <Logo big lang={lang} />
           <h1>{t.welcome}{account?.name && !account.name.includes('@') && !account.name.includes('*') ? `, ${account.name}` : ''}</h1>
           <p className="muted">{t.profileIntro}</p>
         </div>
@@ -394,8 +397,15 @@ function Onboarding({ lang, setLang, initial, onDone, onCancel, account = null, 
 
 // ---------------- landing and sign-up ----------------
 
-function Logo({ big = false }: { big?: boolean }) {
-  return <img className={big ? 'logo big' : 'logo'} src="/logo.svg" alt="FateCal" width={big ? 172 : 115} height={big ? 42 : 28} />;
+// Chinese brand name: 随身命历 (shown next to the FateCal logo in Chinese)
+export const ZH_NAME = '随身命历';
+function Logo({ big = false, lang }: { big?: boolean; lang?: Lang }) {
+  return (
+    <span className={`logowrap ${big ? 'big' : ''}`}>
+      <img className={big ? 'logo big' : 'logo'} src="/logo.svg" alt={lang === 'zh' ? `${ZH_NAME} FateCal` : 'FateCal'} width={big ? 172 : 115} height={big ? 42 : 28} />
+      {lang === 'zh' && <span className="zhname">{ZH_NAME}</span>}
+    </span>
+  );
 }
 
 // Language picker, top right on every screen: 🌐 + the current language + ▾ (native menu, so it works well on phones)
@@ -422,7 +432,7 @@ function Landing({ lang, setLang, providers, onDone }: { lang: Lang; setLang: (l
   return (
     <div className="shell onboard">
       <header className="top">
-        <Logo />
+        <Logo lang={lang} />
         <LangMenu lang={lang} setLang={setLang} />
       </header>
       <PromoBanner lang={lang} />

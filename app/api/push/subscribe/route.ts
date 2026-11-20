@@ -35,7 +35,7 @@ export async function POST(req: Request) {
   if (['en', 'zh', 'es'].includes(b.lang)) rec.lang = b.lang;
   let tested = 0;
   if (b.test) {
-    const msg = { en: ['FateCal reminders are on ✓', "We'll remind you before your events and send a short morning reading."], zh: ['FateCal 提醒已开启 ✓', '日程开始前会提醒你，每天早上也会发一条简短的运势。'], es: ['Recordatorios de FateCal activados ✓', 'Te avisaremos antes de tus eventos y te enviaremos una lectura breve por la mañana.'] }[rec.lang as 'en' | 'zh' | 'es'] ?? ['FateCal', ''];
+    const msg = { en: ['FateCal reminders are on ✓', "We'll remind you before your events and send a short morning reading."], zh: ['随身命历提醒已开启 ✓', '日程开始前会提醒你，每天早上也会发一条简短的运势。'], es: ['Recordatorios de FateCal activados ✓', 'Te avisaremos antes de tus eventos y te enviaremos una lectura breve por la mañana.'] }[rec.lang as 'en' | 'zh' | 'es'] ?? ['FateCal', ''];
     tested = await sendAll(rec, { title: msg[0], body: msg[1], tag: 'test' });
   }
   await writePush(rec);

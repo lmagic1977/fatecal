@@ -26,7 +26,7 @@ const M = {
     foot: 'Open: https://fatecal.com',
   },
   zh: {
-    hello: '你好！我是 FateCal。先把这个 WhatsApp 和你的账号绑定：打开 fatecal.com →「设置」→「WhatsApp」，把看到的绑定码发给我。',
+    hello: '你好！我是随身命历（FateCal）。先把这个 WhatsApp 和你的账号绑定：打开 fatecal.com →「设置」→「WhatsApp」，把看到的绑定码发给我。',
     linked: '✅ 绑定成功！以后直接告诉我你的安排就行，比如“明天下午3点看医生”“每周二、四晚上7点健身”。我会记到 FateCal，并告诉你时间顺不顺。',
     badCode: '这个绑定码无效或已过期。请到 fatecal.com →「设置」→「WhatsApp」重新获取。',
     unlinked: '已解绑，这个 WhatsApp 不再连接你的 FateCal 账号。',
@@ -34,7 +34,7 @@ const M = {
     none: '没听出日期或事情。试试“周五晚上7点和小王吃饭”。',
     voice: '暂时只能读文字。小技巧：点键盘上的 🎤 用语音输入，会自动变成文字。',
     limit: (n: number) => `今天的 ${n} 次一句话添加已用完。到 fatecal.com 升级可以用更多。`,
-    added: (n: number) => (n === 1 ? '✅ 已记到 FateCal：' : `✅ 已记到 FateCal（${n} 件）：`),
+    added: (n: number) => (n === 1 ? '✅ 已记到随身命历：' : `✅ 已记到随身命历（${n} 件）：`),
     better: (t: string, s: number) => `   ↳ 更顺：${t}（${s} 分），可在 App 里一键改`,
     v: { good: '不错', neutral: '一般', bad: '欠佳' }, allDay: '全天', every: '🔁 重复',
     foot: '打开：https://fatecal.com',
