@@ -57,6 +57,7 @@ export const T = {
       repeat: 'Repeat', never: 'Does not repeat', delSeries: 'This repeats. OK = delete every time; Cancel = only this one.',
     },
     bill: {
+      current: (p: string, alt: string) => `Current price: ${p}. You can switch to ${alt} in Manage subscription.`,
       plan: 'Your plan', free: 'Free', basic: 'Basic', premium: 'Premium',
       perMonth: '/month', perYear: '/year', monthly: 'Monthly', yearly: 'Yearly', save: 'save 33%',
       trial: (d: number) => `${d}-day free trial`, trialNote: 'You will not be charged during the trial. We email you before it ends; cancel any time in one tap.',
@@ -296,6 +297,7 @@ export const T = {
       repeat: '重复', never: '不重复', delSeries: '这是重复日程。确定 = 全部删除；取消 = 只删这一次。',
     },
     bill: {
+      current: (p: string, alt: string) => `当前价格：${p}。可在「管理订阅」里改成${alt}。`,
       plan: '你的会员', free: '免费版', basic: '基础版', premium: '高级版',
       perMonth: '/月', perYear: '/年', monthly: '按月', yearly: '按年', save: '省 33%',
       trial: (d: number) => `免费试用 ${d} 天`, trialNote: '试用期内不扣钱。到期前会发邮件提醒你，随时一键退订。',
@@ -535,6 +537,7 @@ export const T = {
       repeat: 'Repetir', never: 'No se repite', delSeries: 'Este evento se repite. Aceptar = borrar todas las veces; Cancelar = solo esta.',
     },
     bill: {
+      current: (p: string, alt: string) => `Precio actual: ${p}. Puedes cambiar a ${alt} en Gestionar suscripción.`,
       plan: 'Tu plan', free: 'Gratis', basic: 'Básico', premium: 'Premium',
       perMonth: '/mes', perYear: '/año', monthly: 'Mensual', yearly: 'Anual', save: 'ahorra 33%',
       trial: (d: number) => `Prueba gratis de ${d} días`, trialNote: 'No se te cobra durante la prueba. Te avisamos por correo antes de que termine; cancela cuando quieras con un toque.',
