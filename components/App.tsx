@@ -76,7 +76,7 @@ export default function App({ initialLang = "en" }: { initialLang?: Lang }) {
   const [langPick, setLangPick] = useState<Lang | null>(null);
   useEffect(() => {
     document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang;
-    document.title = lang === 'zh' ? '随身命历 FateCal：给重要的事，挑个好时间' : lang === 'es' ? 'FateCal: tu asesor BaZi para la vida real' : 'FateCal: your BaZi advisor for real life';
+    document.title = lang === 'zh' ? '随身吉历 FateCal：给重要的事，挑个好时间' : lang === 'es' ? 'FateCal: tu asesor BaZi para la vida real' : 'FateCal: your BaZi advisor for real life';
   }, [lang]);
   const setLang = (l: Lang) => { setLangState(l); setLangPick(l); save(K.langPick, l); };
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -397,8 +397,8 @@ function Onboarding({ lang, setLang, initial, onDone, onCancel, account = null, 
 
 // ---------------- landing and sign-up ----------------
 
-// Chinese brand name: 随身命历 (shown next to the FateCal logo in Chinese)
-export const ZH_NAME = '随身命历';
+// Chinese brand name: 随身吉历 (shown next to the FateCal logo in Chinese)
+export const ZH_NAME = '随身吉历';
 function Logo({ big = false, lang }: { big?: boolean; lang?: Lang }) {
   return (
     <span className={`logowrap ${big ? 'big' : ''}`}>
