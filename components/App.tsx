@@ -1639,7 +1639,7 @@ function PlanCard({ lang, note }: { lang: Lang; note: string }) {
           <p className="small muted">
             {!paidLive && info.grantUntil ? b.giftUntil(d(info.grantUntil)) : info.status === 'trialing' && info.trialEnd ? b.trialEnds(d(info.trialEnd)) : info.cancelAtPeriodEnd ? b.ends(d(info.periodEnd)) : info.periodEnd ? b.renews(d(info.periodEnd)) : ''}
           </p>
-          {paidLive && info.interval && info.plan !== 'free' && (() => {
+          {paidLive && info.interval && (() => {
             const pr = PRICES[info.plan as 'basic' | 'premium'];
             const fmt = (iv: Interval) => `${money(pr[iv].cents)}${iv === 'month' ? b.perMonth : b.perYear}`;
             return <p className="small">{b.current(fmt(info.interval!), fmt(info.interval === 'month' ? 'year' : 'month'))}</p>;
