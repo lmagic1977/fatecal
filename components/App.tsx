@@ -517,6 +517,27 @@ function Landing({ lang, setLang, providers, onDone }: { lang: Lang; setLang: (l
 
 const DIAL = ['+1', '+86', '+852', '+853', '+886', '+65', '+60', '+81', '+82', '+44', '+61', '+64', '+33', '+49', '+52'];
 
+// Catch common email typos before sending a code: hotmail.con → hotmail.com, gmial.com → gmail.com, qq.cm → qq.com
+const MAIL_DOMAINS = ['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com', 'icloud.com', 'qq.com', '163.com', '126.com', 'live.com', 'msn.com', 'aol.com', 'me.com', 'sina.com', 'foxmail.com'];
+function emailTypo(email: string): string | null {
+  const m = email.trim().toLowerCase().match(/^([^@\s]+)@([^@\s]+)$/);
+  if (!m) return null;
+  const [, user, dom] = m;
+  if (MAIL_DOMAINS.includes(dom)) return null;
+  const dist = (a: string, b: string) => {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    return d[a.length][b.length];
+  };
+  let best: string | null = null, bd = 3;
+  for (const c of MAIL_DOMAINS) { const x = dist(dom, c); if (x < bd) { bd = x; best = c; } }
+  if (best) return `${user}@${best}`;
+  // any domain ending in a mistyped .com (.con, .cmo, .co m)
+  const fixed = dom.replace(/\.(con|cmo|ocm|vom|xom|cm|om|comm|coom)$/, '.com');
+  return fixed !== dom ? `${user}@${fixed}` : null;
+}
+
 function SignUp({ lang, providers }: { lang: Lang; providers: string[] }) {
   const t = T[lang];
   const [mode, setMode] = useState<'pick' | 'email' | 'phone'>('pick');
@@ -527,12 +548,18 @@ function SignUp({ lang, providers }: { lang: Lang; providers: string[] }) {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [typo, setTypo] = useState<string | null>(null);
+  const [typoAsked, setTypoAsked] = useState(false);
   const to = mode === 'email' ? email.trim() : `${dial}${num.replace(/[^\d]/g, '').replace(/^0+/, '')}`;
   const social = providers.filter((p) => p === 'google' || p === 'facebook');
 
   async function send() {
     setErr('');
     if (mode === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) { setErr(t.badEmail); return; }
+    if (mode === 'email' && step === 'enter' && !typoAsked) {
+      const fix = emailTypo(email);
+      if (fix) { setTypo(fix); setTypoAsked(true); return; }
+    }
     if (mode === 'phone' && !/^\+[1-9]\d{6,14}$/.test(to)) { setErr(t.badPhone); return; }
     setBusy(true);
     const res = await fetch('/api/auth/otp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ channel: mode, to, lang }) }).catch(() => null);
@@ -569,7 +596,15 @@ function SignUp({ lang, providers }: { lang: Lang; providers: string[] }) {
       {mode !== 'pick' && step === 'enter' && (
         <form className="form flat" onSubmit={(e) => { e.preventDefault(); send(); }}>
           {mode === 'email' ? (
-            <label>{t.emailLabel}<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" inputMode="email" required autoFocus /></label>
+            <>
+            <label>{t.emailLabel}<input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setTypo(null); setTypoAsked(false); }} autoComplete="email" inputMode="email" required autoFocus /></label>
+            {typo && (
+              <div className="suggest small" role="alert">
+                {t.didYouMean} <b>{typo}</b>?{' '}
+                <button type="button" className="link" onClick={() => { setEmail(typo); setTypo(null); setTypoAsked(false); }}>{t.useThis}</button>
+              </div>
+            )}
+            </>
           ) : (
             <div className="row gap">
               <label className="dial">{t.country}<select value={dial} onChange={(e) => setDial(e.target.value)}>{DIAL.map((d) => <option key={d} value={d}>{d}</option>)}</select></label>
