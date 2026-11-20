@@ -13,6 +13,8 @@ export async function GET(req: Request) {
   const to = (process.env.REPORT_TO || adminEmails().join(',')).trim();
   const s = await stats();
   const r = renderReport(s);
+  // ?send=0 → just return the report (used to post it in chat instead of email)
+  if (new URL(req.url).searchParams.get('send') === '0') return NextResponse.json({ subject: r.subject, text: r.text });
   if (!to || !process.env.POSTMARK_SERVER_TOKEN) return NextResponse.json({ sent: false, reason: 'no_recipient_or_mail', stats: s });
   const res = await fetch('https://api.postmarkapp.com/email', {
     method: 'POST',
