@@ -1,10 +1,13 @@
 import type { Metadata } from 'next';
 import LegalPage from '@/components/LegalPage';
 import ShoppingResources from '@/components/ShoppingResources';
+import { notFound } from 'next/navigation';
+import { SHOPPING_ON } from '@/lib/site';
 
 export const metadata: Metadata = { title: 'Planning tools & affiliate disclosure · FateCal', alternates: { canonical: '/resources' } };
 
 export default function Resources() {
+  if (!SHOPPING_ON) notFound();
   return (
     <LegalPage title="Planning tools & reading" updated="November 19, 2026">
       <p>FateCal helps you reflect on dates and plans. These optional resources support the practical work of learning, writing things down and preparing for a trip. Start with what you already own.</p>

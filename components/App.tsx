@@ -9,7 +9,7 @@ import { buildContext, fallbackAnswer, fmtDay, fmtHour } from '@/lib/bot';
 import Footer from '@/components/Footer';
 import { signIn, signOut } from 'next-auth/react';
 import ShoppingResources from '@/components/ShoppingResources';
-import { CONTACT_EMAIL, ACCOUNTS_ON } from '@/lib/site';
+import { CONTACT_EMAIL, ACCOUNTS_ON, SHOPPING_ON } from '@/lib/site';
 import type { MailItem } from '@/lib/mail';
 import { LIMITS, PRICES, TRIAL_DAYS, money, type Interval, type Limits, type Plan } from '@/lib/plans';
 
@@ -665,7 +665,7 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
         setManual([...manual, e]); setAdding(false);
       }} onCancel={() => setAdding(false)} />}
       {toast && <div className="toast" role="status">{toast}</div>}
-      <ShoppingResources lang={lang} />
+      {SHOPPING_ON && <ShoppingResources lang={lang} />}
     </div>
   );
 }
@@ -1107,7 +1107,7 @@ function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Ch
           <div className="suggest">
             <p className="small"><b>{cell === 'C' ? f.center : dn(cell as Dir)} · {zh ? c.zh : c.en}</b>: {zh ? c.zh2 : c.en2}</p>
             <p className="small">{zh ? c.fixZh : c.fixEn}</p>
-            {c.query && <a className="link shopping-link" href={amazon(c.query)} target="_blank" rel="sponsored nofollow noopener noreferrer">{f.shop}</a>}
+            {SHOPPING_ON && c.query && <a className="link shopping-link" href={amazon(c.query)} target="_blank" rel="sponsored nofollow noopener noreferrer">{f.shop}</a>}
             {c.query && <p className="tiny muted">{f.shopNote}</p>}
           </div>
         )}
@@ -1129,7 +1129,7 @@ function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Ch
           <div className="suggest">
             <div className="row gap"><VerdictTag v={home.verdict} lang={lang} /><b>{f.houseSits} {dn(home.sitting)} {f.houseFaces} {dn(home.facing)} · {home.score}</b></div>
             <ul className="reasons">{home.notes.map((n, i) => <li key={i}>{zh ? n.zh : n.en}</li>)}</ul>
-            {FLY[home.doorStarThisYear].query && FLY[home.doorStarThisYear].tone === 'bad' && (
+            {SHOPPING_ON && FLY[home.doorStarThisYear].query && FLY[home.doorStarThisYear].tone === 'bad' && (
               <a className="link shopping-link" href={amazon(FLY[home.doorStarThisYear].query!)} target="_blank" rel="sponsored nofollow noopener noreferrer">{f.shop}</a>
             )}
           </div>

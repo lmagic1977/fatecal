@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import LegalPage from '@/components/LegalPage';
-import { CONTACT_EMAIL } from '@/lib/site';
+import { CONTACT_EMAIL, SHOPPING_ON } from '@/lib/site';
 
 export const metadata: Metadata = { title: 'Privacy Policy · FateCal', alternates: { canonical: '/privacy' } };
 
@@ -36,7 +36,7 @@ export default function Privacy() {
       <h2>Affiliate links</h2>
       <p>Some links to travel and shopping sites are affiliate links. If you book or buy through them, we may earn a commission at no extra cost to you. The planning and reading tools are general suggestions, not personalized chart prescriptions. Our Amazon links use fixed search keywords and the affiliate ID fatecal-20; they do not include your birth details, chart or calendar events. Amazon may use cookies or other identifiers when you visit its site.</p>
 
-      <p>As an Amazon Associate I earn from qualifying purchases. Read our <a href="/resources">affiliate disclosure and selection approach</a>.</p>
+      {SHOPPING_ON && <p>As an Amazon Associate I earn from qualifying purchases. Read our <a href="/resources">affiliate disclosure and selection approach</a>.</p>}
 
       <h2>Children</h2>
       <p>FateCal is not directed to children under 13, and we do not knowingly collect their information.</p>
