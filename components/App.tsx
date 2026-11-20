@@ -21,7 +21,7 @@ interface Seed { q: string; photo?: Pic }
 const birthFsYear = (b: BirthInput) => liChunYear(new Date(b.year, b.month - 1, b.day, b.hourUnknown ? 12 : b.hour, b.hourUnknown ? 0 : b.minute));
 interface Msg { role: 'user' | 'assistant'; text: string; image?: string }
 
-const K = { owner: 'fatecal.owner', profile: 'fatecal.profile', events: 'fatecal.events', ics: 'fatecal.ics', lang: 'fatecal.lang', mailKey: 'fatecal.mailkey', mailAddr: 'fatecal.mailaddr', mail: 'fatecal.mail' };
+const K = { owner: 'fatecal.owner', profile: 'fatecal.profile', events: 'fatecal.events', ics: 'fatecal.ics', lang: 'fatecal.lang', mailKey: 'fatecal.mailkey', mailAddr: 'fatecal.mailaddr', mail: 'fatecal.mail', mailEdits: 'fatecal.mailedits' };
 
 function load<T>(k: string, fallback: T): T {
   try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
@@ -36,13 +36,15 @@ const isoLocalDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-$
 
 // "YYYY-MM-DD" / "YYYY-MM-DDTHH:mm" are local wall times; anything with an offset is absolute.
 const parseMailTime = (v: string) => (/[zZ]|[+-]\d{2}:?\d{2}$/.test(v) ? new Date(v) : new Date(v.length === 10 ? `${v}T00:00` : v));
+// what each kind of forwarded email is, for judging its date
+const MAIL_CAT: Partial<Record<MailItem['kind'], Category>> = { meeting: 'meeting', travel: 'travel', order: 'money', bill: 'money', contract: 'signing' };
 const mailToEvent = (m: MailItem): CalEvent | null => {
   if (!m.start || m.kind === 'verify' || m.kind === 'limit') return null;
   const s = parseMailTime(m.start);
   if (isNaN(s.getTime())) return null;
   const allDay = !!m.allDay || m.start.length === 10;
   const e = m.end ? parseMailTime(m.end) : new Date(s.getTime() + (allDay ? 24 : 1) * 3600e3);
-  return { id: `mail-${m.id}`, title: m.title, start: s.toISOString(), end: (isNaN(e.getTime()) ? new Date(s.getTime() + 3600e3) : e).toISOString(), allDay, source: 'email', from: m.from };
+  return { id: `mail-${m.id}`, title: m.title, start: s.toISOString(), end: (isNaN(e.getTime()) ? new Date(s.getTime() + 3600e3) : e).toISOString(), allDay, source: 'email', from: m.from, cat: MAIL_CAT[m.kind] };
 };
 
 export default function App() {
@@ -58,6 +60,8 @@ export default function App() {
   const [account, setAccount] = useState<Account | null>(null);
   const [providers, setProviders] = useState<string[]>([]);
   const [seed, setSeed] = useState<Seed | null>(null);
+  // changes the user made to events that came from email: a new time, or null when removed
+  const [mailEdits, setMailEdits] = useState<Record<string, { start: string; end: string } | null>>({});
   const [mailUsage, setMailUsage] = useState<{ used: number; limit: number } | null>(null);
   const [authed, setAuthed] = useState<'checking' | 'out' | 'in'>('checking');
   const synced = useRef(false);
@@ -69,6 +73,7 @@ export default function App() {
     setManual(load<CalEvent[]>(K.events, []));
     setIcs(load(K.ics, null));
     setMail(load<MailItem[]>(K.mail, []));
+    setMailEdits(load(K.mailEdits, {}));
     setMailKey(load<string | null>(K.mailKey, null));
     setMailAddr(load<string | null>(K.mailAddr, null));
     setReady(true);
@@ -77,6 +82,7 @@ export default function App() {
   useEffect(() => { if (ready) save(K.events, manual); }, [manual, ready]);
   useEffect(() => { if (ready) save(K.ics, ics); }, [ics, ready]);
   useEffect(() => { if (ready) save(K.mail, mail.slice(-200)); }, [mail, ready]);
+  useEffect(() => { if (ready) save(K.mailEdits, mailEdits); }, [mailEdits, ready]);
 
   // Accounts: when signed in, the chart, events and settings are kept on the server and follow the user.
   useEffect(() => {
@@ -151,7 +157,19 @@ export default function App() {
   }, [ready]);
 
   const chart = useMemo(() => (profile ? computeChart(profile.birth) : null), [profile]);
-  const events = useMemo(() => [...manual, ...(ics?.events ?? []), ...(mail.map(mailToEvent).filter(Boolean) as CalEvent[])].sort((a, b) => a.start.localeCompare(b.start)), [manual, ics, mail]);
+  const mailEvents = useMemo(() => (mail.map(mailToEvent).filter(Boolean) as CalEvent[])
+    .filter((e) => mailEdits[e.id] !== null)
+    .map((e) => (mailEdits[e.id] ? { ...e, ...mailEdits[e.id]! } : e)), [mail, mailEdits]);
+  const events = useMemo(() => [...manual, ...(ics?.events ?? []), ...mailEvents].sort((a, b) => a.start.localeCompare(b.start)), [manual, ics, mailEvents]);
+  // move or remove any event the user owns in FateCal: ones they added, and ones that came from email
+  const moveEvent = (e: CalEvent, start: string, end: string) => {
+    if (e.source === 'manual') setManual(manual.map((m) => (m.id === e.id ? { ...m, start, end } : m)));
+    else if (e.source === 'email') setMailEdits({ ...mailEdits, [e.id]: { start, end } });
+  };
+  const removeEvent = (e: CalEvent) => {
+    if (e.source === 'manual') setManual(manual.filter((m) => m.id !== e.id));
+    else if (e.source === 'email') setMailEdits({ ...mailEdits, [e.id]: null });
+  };
   const t = T[lang];
 
   // Before local data loads (and on the server) show the onboarding screen, so the page has real content for search engines.
@@ -180,7 +198,7 @@ export default function App() {
         <button className="lang" onClick={() => setLang(lang === 'en' ? 'zh' : 'en')} aria-label="Switch language">{lang === 'en' ? '中文' : 'EN'}</button>
       </header>
       <main className="main">
-        {tab === 'today' && <Today lang={lang} chart={chart} events={events} manual={manual} setManual={setManual} name={profile.name} />}
+        {tab === 'today' && <Today lang={lang} chart={chart} events={events} manual={manual} setManual={setManual} name={profile.name} onMove={moveEvent} onRemove={removeEvent} />}
         {tab === 'ask' && <Ask lang={lang} chart={chart} events={events} profile={profile} seed={seed} clearSeed={() => setSeed(null)} />}
         {tab === 'home' && <FengShui lang={lang} chart={chart} profile={profile} setSex={(sx) => { const p = { ...profile, sex: sx }; setProfile(p); save(K.profile, p); }} ask={(sd) => { setSeed(sd); setTab('ask'); }} />}
         {tab === 'chart' && <ChartView lang={lang} chart={chart} profile={profile} onEdit={(p) => { setProfile(p); save(K.profile, p); }} />}
@@ -464,7 +482,7 @@ function ScoreRing({ score, label }: { score: number; label: string }) {
   );
 }
 
-function Today({ lang, chart, events, manual, setManual, name }: { lang: Lang; chart: Chart; events: CalEvent[]; manual: CalEvent[]; setManual: (e: CalEvent[]) => void; name: string }) {
+function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove }: { lang: Lang; chart: Chart; events: CalEvent[]; manual: CalEvent[]; setManual: (e: CalEvent[]) => void; name: string; onMove: (e: CalEvent, s: string, en: string) => void; onRemove: (e: CalEvent) => void }) {
   const t = T[lang];
   const v = t.v2;
   const [day, setDay] = useState(() => new Date());
@@ -566,8 +584,8 @@ function Today({ lang, chart, events, manual, setManual, name }: { lang: Lang; c
       {todays.length === 0 && <p className="muted small">{t.noEvents}</p>}
       {todays.map((e) => (
         <EventCard key={e.id} lang={lang} chart={chart} ev={e} all={events}
-          onMove={(s, en) => { setManual(manual.map((m) => (m.id === e.id ? { ...m, start: s, end: en } : m))); flash(v.movedToast); }}
-          onDelete={() => setManual(manual.filter((m) => m.id !== e.id))} />
+          onMove={(s, en) => { onMove(e, s, en); flash(v.movedToast); }}
+          onDelete={() => { if (e.source !== 'email' || confirm(t.v2.removeMailConfirm)) onRemove(e); }} />
       ))}
       <button className="addbig" onClick={() => setAdding(true)}>+ {v.addOrConnect}</button>
       {adding && <AddEvent lang={lang} day={day} onSave={(e) => { setManual([...manual, e]); setAdding(false); }} onCancel={() => setAdding(false)} />}
@@ -703,19 +721,22 @@ function EventCard({ lang, chart, ev, all, onMove, onDelete }: { lang: Lang; cha
             <div className="ev-title">{ev.title}</div>
             <span className={`vscore ${r.verdict}`}>{t[r.verdict]} {r.score}</span>
           </div>
+          {ev.source !== 'manual' && <div className="srctag">{ev.source === 'email' ? `📧 ${v.fromMail}${ev.from ? ` · ${ev.from.split('@').pop()}` : ''}` : `🗓️ ${v.fromCal}`}</div>}
           {tops.length > 0 && <div className="evline">{actLabel}{tops.map((x) => (lang === 'zh' ? x.zh : x.en)).join(' ')}</div>}
           {!ev.allDay && r.verdict === 'good' && alt && <div className="evline">{t.evenBetter} <b>{altLabel}</b> ({alt.score})</div>}
           {!ev.allDay && r.verdict === 'bad' && !alt && <div className="evline">{t.noBetter}</div>}
         </div>
       </div>
       <div className="evactions">
-        {showMove && (ev.source === 'manual'
+        {showMove && (ev.source !== 'calendar'
           ? <button className="primary" onClick={() => onMove(alt.start, alt.end)}>⇢ {sameD ? v.moveTo : v.tryDay} {altLabel} ({alt.score})</button>
           : <button className="primary" onClick={() => { navigator.clipboard?.writeText(note); setCopied(true); }}>{copied ? t.copied : `${t.copyNote} · ${altLabel}`}</button>)}
         <button className="softbtn" onClick={() => setWhy(!why)} aria-expanded={why}>{why ? t.hide : t.why}</button>
-        {ev.source === 'manual' && <button className="link danger" onClick={onDelete}>{t.del}</button>}
+        {ev.source === 'email' && showMove && <button className="link" onClick={() => { navigator.clipboard?.writeText(note); setCopied(true); }}>{copied ? t.copied : t.copyNote}</button>}
+        {ev.source !== 'calendar' && <button className="link danger" onClick={onDelete}>{t.del}</button>}
       </div>
-      {showMove && ev.source !== 'manual' && <p className="tiny">{t.calendarNote}</p>}
+      {showMove && ev.source === 'calendar' && <p className="tiny">{t.calendarNote}</p>}
+      {ev.source === 'email' && showMove && <p className="tiny">{v.mailMoveNote}</p>}
       {why && (
         <div className="whybox">
           <ul>

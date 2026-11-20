@@ -333,7 +333,7 @@ export function dayActivities(chart: Chart, date: Date) {
   return { good, avoid };
 }
 
-export interface CalEvent { id: string; title: string; start: string; end: string; allDay?: boolean; source: 'manual' | 'calendar' | 'email'; from?: string }
+export interface CalEvent { id: string; title: string; start: string; end: string; allDay?: boolean; source: 'manual' | 'calendar' | 'email'; from?: string; cat?: Category }
 
 export interface EventReading extends MomentScore { category: Category; alternatives: { start: string; end: string; score: number; verdict: Verdict }[] }
 
@@ -343,7 +343,7 @@ const overlaps = (a0: number, a1: number, b0: number, b1: number) => a0 < b1 && 
 // that do not overlap any other event. Slots start on the traditional two-hour boundaries.
 export function readEvent(chart: Chart, ev: CalEvent, all: CalEvent[]): EventReading {
   const start = new Date(ev.start), end = new Date(ev.end);
-  const category = categorize(ev.title);
+  const category = (ev.cat && ev.cat !== 'general' && categorize(ev.title) === 'general' ? ev.cat : categorize(ev.title));
   const base = scoreMoment(chart, start, category);
   const alternatives: EventReading['alternatives'] = [];
   if (!ev.allDay) {

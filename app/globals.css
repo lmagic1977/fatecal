@@ -445,3 +445,4 @@ input:focus-visible, select:focus-visible { outline-color: var(--brand); }
   .desk .toast { position: absolute; }
   .desk .sheet-bg { position: absolute; }
 }
+.srctag { display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--brand-ink); background: var(--brand-soft); border-radius: 999px; padding: 2px 9px; margin-top: 4px; }
