@@ -436,6 +436,8 @@ function Landing({ lang, setLang, providers, onDone }: { lang: Lang; setLang: (l
         </div>
         <p className="tiny">{l.tryNote}</p>
       </div>
+      {/* sign-up right under the headline, so Google / email / phone are visible without scrolling far */}
+      {ACCOUNTS_ON && <div id="start"><SignUp lang={lang} providers={providers} /></div>}
 
       <section id="demo" className="demo" aria-label={l.demoLabel}>
         <div className="tiny demo-k">{l.demoLabel}</div>
@@ -483,16 +485,20 @@ function Landing({ lang, setLang, providers, onDone }: { lang: Lang; setLang: (l
         {l.faq.map(([q, a]) => <details key={q}><summary>{q}</summary><p className="small muted">{a}</p></details>)}
       </section>
 
-      <section id="start" className="startform">
-        <h2 className="display sm">{l.formH}</h2>
-        <p className="small muted">{l.formP}</p>
-        <div className="seg">
-          <button className={lang === 'en' ? 'on' : ''} onClick={() => setLang('en')}>English</button>
-          <button className={lang === 'zh' ? 'on' : ''} onClick={() => setLang('zh')}>中文</button>
-          <button className={lang === 'es' ? 'on' : ''} onClick={() => setLang('es')}>Español</button>
-        </div>
-      </section>
-      {ACCOUNTS_ON ? <SignUp lang={lang} providers={providers} /> : <Onboarding lang={lang} setLang={setLang} initial={null} onDone={onDone} embedded />}
+      {ACCOUNTS_ON ? (
+        <section className="startform stack">
+          <h2 className="display sm">{l.formH}</h2>
+          <button className="primary" onClick={() => go('start')}>{t.signUp} ↑</button>
+        </section>
+      ) : (
+        <>
+          <section id="start" className="startform">
+            <h2 className="display sm">{l.formH}</h2>
+            <p className="small muted">{l.formP}</p>
+          </section>
+          <Onboarding lang={lang} setLang={setLang} initial={null} onDone={onDone} embedded />
+        </>
+      )}
       <p className="muted small pad">{t.simplified}</p>
       <Footer lang={lang} />
     </div>
