@@ -25,6 +25,7 @@ export async function GET() {
   };
   // fall back to data saved under the older provider-based id (the next save moves it to the new id)
   const data = (await read(u.uid)) ?? (u.alt && u.alt !== u.uid ? await read(u.alt) : null);
+  await import('@/lib/accounts').then((m) => m.touch(u.uid, u.email, u.name)).catch(() => {});
   return NextResponse.json({ user: { name: u.name, email: u.email, image: u.image }, data });
 }
 

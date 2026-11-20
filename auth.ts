@@ -44,12 +44,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     // A stable account id. Verified emails share one account whether you use Google or an email code;
     // `alt` keeps the older provider-based id so data saved under it is still found.
-    jwt({ token, account, user, profile }) {
+    async jwt({ token, account, user, profile }) {
       if (account?.provider === 'otp' && user?.id) token.uid = user.id;
       else if (account) {
         token.alt = `${account.provider}:${account.providerAccountId}`;
         const email = (profile as any)?.email;
         token.uid = account.provider === 'google' && email && (profile as any)?.email_verified ? `email:${String(email).toLowerCase()}` : token.alt;
+      }
+      // account is only present at sign-in: note the sign-up / visit for the operator's daily report
+      if (account && token.uid) {
+        const provider = account.provider === 'otp' ? (String(token.uid).startsWith('phone:') ? 'phone' : 'email') : account.provider;
+        await import('@/lib/accounts').then((m) => m.recordSignIn(String(token.uid), provider, user?.email, user?.name)).catch(() => {});
       }
       return token;
     },
