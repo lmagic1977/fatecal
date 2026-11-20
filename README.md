@@ -31,6 +31,10 @@ A moment starts at 60 and moves with:
 Good ≥ 68, neutral 52–67, bad < 52. Favorable elements use a simplified strength count (month branch weighted double).
 **These rules should be reviewed by a BaZi consultant before launch.**
 
+## Making money, honestly
+
+Read [docs/monetization-principles.md](docs/monetization-principles.md) before building anything that sells: advice before products, no fear or guarantees, every affiliate link labelled, easy cancelling.
+
 ## Develop
 
 ```bash
