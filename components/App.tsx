@@ -21,7 +21,7 @@ interface Seed { q: string; photo?: Pic }
 const birthFsYear = (b: BirthInput) => liChunYear(new Date(b.year, b.month - 1, b.day, b.hourUnknown ? 12 : b.hour, b.hourUnknown ? 0 : b.minute));
 interface Msg { role: 'user' | 'assistant'; text: string; image?: string }
 
-const K = { owner: 'fatecal.owner', profile: 'fatecal.profile', events: 'fatecal.events', ics: 'fatecal.ics', lang: 'fatecal.lang', mailKey: 'fatecal.mailkey', mailAddr: 'fatecal.mailaddr', mail: 'fatecal.mail', mailEdits: 'fatecal.mailedits' };
+const K = { owner: 'fatecal.owner', profile: 'fatecal.profile', events: 'fatecal.events', ics: 'fatecal.ics', lang: 'fatecal.lang', mailKey: 'fatecal.mailkey', mailAddr: 'fatecal.mailaddr', mail: 'fatecal.mail', mailEdits: 'fatecal.mailedits', gcalKey: 'fatecal.gcalkey', gcal: 'fatecal.gcal' };
 
 function load<T>(k: string, fallback: T): T {
   try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
@@ -62,6 +62,9 @@ export default function App() {
   const [seed, setSeed] = useState<Seed | null>(null);
   // changes the user made to events that came from email: a new time, or null when removed
   const [mailEdits, setMailEdits] = useState<Record<string, { start: string; end: string } | null>>({});
+  // Google Calendar (read-only): the browser's key, and the last events we read
+  const [gcalKey, setGcalKey] = useState<string | null>(null);
+  const [gcal, setGcal] = useState<GcalState | null>(null);
   const [mailUsage, setMailUsage] = useState<{ used: number; limit: number } | null>(null);
   const [authed, setAuthed] = useState<'checking' | 'out' | 'in'>('checking');
   const synced = useRef(false);
@@ -74,6 +77,8 @@ export default function App() {
     setIcs(load(K.ics, null));
     setMail(load<MailItem[]>(K.mail, []));
     setMailEdits(load(K.mailEdits, {}));
+    setGcalKey(load<string | null>(K.gcalKey, null));
+    setGcal(load<GcalState | null>(K.gcal, null));
     setMailKey(load<string | null>(K.mailKey, null));
     setMailAddr(load<string | null>(K.mailAddr, null));
     setReady(true);
@@ -83,6 +88,24 @@ export default function App() {
   useEffect(() => { if (ready) save(K.ics, ics); }, [ics, ready]);
   useEffect(() => { if (ready) save(K.mail, mail.slice(-200)); }, [mail, ready]);
   useEffect(() => { if (ready) save(K.mailEdits, mailEdits); }, [mailEdits, ready]);
+  useEffect(() => { if (ready) save(K.gcal, gcal); }, [gcal, ready]);
+  async function refreshGcal(key = gcalKey) {
+    if (!key) return false;
+    const j = await fetch('/api/gcal/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key }) }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (!j) return false;
+    if (!j.connected) { setGcal(null); return false; }
+    setGcal({ email: j.email, events: j.events, at: new Date().toISOString() });
+    return true;
+  }
+  // after Google sends the person back: read their calendar, open Settings, tidy the address bar
+  useEffect(() => {
+    if (!ready) return;
+    const r = new URLSearchParams(location.search).get('gcal');
+    if (r) { history.replaceState(null, '', location.pathname); setTab('settings'); setGcalNote(r); }
+    if (gcalKey) refreshGcal();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
+  const [gcalNote, setGcalNote] = useState('');
 
   // Accounts: when signed in, the chart, events and settings are kept on the server and follow the user.
   useEffect(() => {
@@ -160,7 +183,7 @@ export default function App() {
   const mailEvents = useMemo(() => (mail.map(mailToEvent).filter(Boolean) as CalEvent[])
     .filter((e) => mailEdits[e.id] !== null)
     .map((e) => (mailEdits[e.id] ? { ...e, ...mailEdits[e.id]! } : e)), [mail, mailEdits]);
-  const events = useMemo(() => [...manual, ...(ics?.events ?? []), ...mailEvents].sort((a, b) => a.start.localeCompare(b.start)), [manual, ics, mailEvents]);
+  const events = useMemo(() => [...manual, ...(ics?.events ?? []), ...(gcal?.events ?? []), ...mailEvents].sort((a, b) => a.start.localeCompare(b.start)), [manual, ics, gcal, mailEvents]);
   // move or remove any event the user owns in FateCal: ones they added, and ones that came from email
   const moveEvent = (e: CalEvent, start: string, end: string) => {
     if (e.source === 'manual') setManual(manual.map((m) => (m.id === e.id ? { ...m, start, end } : m)));
@@ -203,7 +226,11 @@ export default function App() {
         {tab === 'home' && <FengShui lang={lang} chart={chart} profile={profile} setSex={(sx) => { const p = { ...profile, sex: sx }; setProfile(p); save(K.profile, p); }} ask={(sd) => { setSeed(sd); setTab('ask'); }} />}
         {tab === 'chart' && <ChartView lang={lang} chart={chart} profile={profile} onEdit={(p) => { setProfile(p); save(K.profile, p); }} />}
         {tab === 'settings' && (
-          <Settings lang={lang} setLang={setLang} ics={ics} setIcs={setIcs} chart={chart} account={account} providers={providers}
+          <Settings lang={lang} setLang={setLang} ics={ics} setIcs={setIcs}
+            gcal={gcal} gcalNote={gcalNote}
+            onGcalConnect={() => { let k = gcalKey; if (!k) { k = crypto.randomUUID(); save(K.gcalKey, k); setGcalKey(k); } location.href = `/api/gcal/start?key=${encodeURIComponent(k)}`; }}
+            onGcalRefresh={() => refreshGcal()}
+            onGcalDisconnect={async () => { if (gcalKey) await fetch('/api/gcal/disconnect', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: gcalKey }) }).catch(() => {}); setGcal(null); setGcalNote(''); }} chart={chart} account={account} providers={providers}
             mail={mail} mailAddr={mailAddr} mailUsage={mailUsage} onEnableMail={enableMail} onCheckMail={() => checkMail()} onClearMail={() => setMail([])}
             onReset={() => { if (confirm(t.resetConfirm)) { Object.values(K).forEach((k) => localStorage.removeItem(k)); location.reload(); } }} />
         )}
@@ -1183,7 +1210,7 @@ function ChartView({ lang, chart, profile, onEdit }: { lang: Lang; chart: Chart;
 
 // ---------------- settings ----------------
 
-function Settings({ lang, setLang, ics, setIcs, onReset, chart, mail, mailAddr, mailUsage, onEnableMail, onCheckMail, onClearMail, account, providers }: { account: Account | null; providers: string[]; lang: Lang; setLang: (l: Lang) => void; ics: { url: string; events: CalEvent[]; at?: string } | null; setIcs: (v: { url: string; events: CalEvent[]; at?: string } | null) => void; onReset: () => void; chart: Chart; mail: MailItem[]; mailAddr: string | null; mailUsage: { used: number; limit: number } | null; onEnableMail: () => Promise<void>; onCheckMail: () => Promise<number>; onClearMail: () => void }) {
+function Settings({ lang, setLang, ics, setIcs, gcal, gcalNote, onGcalConnect, onGcalRefresh, onGcalDisconnect, onReset, chart, mail, mailAddr, mailUsage, onEnableMail, onCheckMail, onClearMail, account, providers }: { gcal: GcalState | null; gcalNote: string; onGcalConnect: () => void; onGcalRefresh: () => Promise<boolean>; onGcalDisconnect: () => Promise<void>; account: Account | null; providers: string[]; lang: Lang; setLang: (l: Lang) => void; ics: { url: string; events: CalEvent[]; at?: string } | null; setIcs: (v: { url: string; events: CalEvent[]; at?: string } | null) => void; onReset: () => void; chart: Chart; mail: MailItem[]; mailAddr: string | null; mailUsage: { used: number; limit: number } | null; onEnableMail: () => Promise<void>; onCheckMail: () => Promise<number>; onClearMail: () => void }) {
   const t = T[lang];
   const [url, setUrl] = useState(ics?.url ?? '');
   const [state, setState] = useState<'idle' | 'busy' | 'error'>('idle');
@@ -1206,6 +1233,8 @@ function Settings({ lang, setLang, ics, setIcs, onReset, chart, mail, mailAddr, 
       </section>
       <section className="card form">
         <div className="label">{t.calendar}</div>
+        <GcalCard lang={lang} gcal={gcal} note={gcalNote} onConnect={onGcalConnect} onRefresh={onGcalRefresh} onDisconnect={onGcalDisconnect} />
+        <div className="orline small muted">{t.gc.orPaste}</div>
         <label>{t.icsLabel}<input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" inputMode="url" /></label>
         <p className="muted small">{t.icsHelp}</p>
         {ics?.url ? (
@@ -1222,6 +1251,34 @@ function Settings({ lang, setLang, ics, setIcs, onReset, chart, mail, mailAddr, 
       <p className="muted small">{t.privacy}</p>
       <button className="ghost danger danger-btn" onClick={onReset}>{t.reset}</button>
       <Footer lang={lang} />
+    </div>
+  );
+}
+
+interface GcalState { email?: string; events: CalEvent[]; at: string }
+
+function GcalCard({ lang, gcal, note, onConnect, onRefresh, onDisconnect }: { lang: Lang; gcal: GcalState | null; note: string; onConnect: () => void; onRefresh: () => Promise<boolean>; onDisconnect: () => Promise<void> }) {
+  const g = T[lang].gc;
+  const [busy, setBusy] = useState(false);
+  const msg = note === 'declined' ? g.declined : note === 'noscope' ? g.noScope : note === 'error' ? g.failed : '';
+  if (!gcal) {
+    return (
+      <div className="stack" style={{ gap: 8 }}>
+        <button className="social" onClick={onConnect}><ProviderIcon id="google" /> {g.connect}</button>
+        <p className="tiny">{g.readOnly}</p>
+        {msg && <p className="small danger" role="alert">{msg}</p>}
+      </div>
+    );
+  }
+  const upcoming = gcal.events.filter((e) => new Date(e.end) >= new Date()).length;
+  return (
+    <div className="suggest">
+      <p className="small"><b>✓ {g.connected}</b>{gcal.email ? ` · ${gcal.email}` : ''}</p>
+      <p className="small muted" aria-live="polite">{g.count(upcoming)}</p>
+      <div className="row gap">
+        <button className="ghost" disabled={busy} onClick={async () => { setBusy(true); await onRefresh(); setBusy(false); }}>{busy ? T[lang].syncing : g.refresh}</button>
+        <button className="link danger" onClick={async () => { if (confirm(g.disconnectConfirm)) await onDisconnect(); }}>{g.disconnect}</button>
+      </div>
     </div>
   );
 }
