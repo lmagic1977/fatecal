@@ -1509,6 +1509,7 @@ function Settings({ lang, setLang, ics, setIcs, billNote, gcal, gcalNote, onGcal
           <button className={lang === 'es' ? 'on' : ''} onClick={() => setLang('es')}>Español</button>
         </div>
       </section>
+      {ACCOUNTS_ON && <ReminderCard lang={lang} />}
       {ACCOUNTS_ON && <WhatsAppCard lang={lang} />}
       <section className="card form">
         <div className="label">{t.calendar}</div>
@@ -1613,6 +1614,91 @@ function PlanCard({ lang, note }: { lang: Lang; note: string }) {
           <button className="ghost" disabled={busy || !code.trim()}>{b.redeem}</button>
         </form>
       )}
+    </section>
+  );
+}
+
+// ---------------- reminders (web push) ----------------
+const b64key = (k: string) => { const p = '='.repeat((4 - (k.length % 4)) % 4); const r = atob((k + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(r, (c) => c.charCodeAt(0)); };
+
+function ReminderCard({ lang }: { lang: Lang }) {
+  const r = T[lang].rm;
+  const [srv, setSrv] = useState<{ enabled: boolean; key: string | null; prefs: { before: number; morning: boolean; morningHour: number } } | null>(null);
+  const [sub, setSub] = useState<PushSubscription | null>(null);
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  const ios = /iPhone|iPad|iPod/.test(ua);
+  const inApp = /MicroMessenger|FBAN|FBAV|Instagram|Line\//i.test(ua);
+  const standalone = typeof window !== 'undefined' && (window.matchMedia?.('(display-mode: standalone)').matches || (navigator as any).standalone === true);
+  const can = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  useEffect(() => {
+    fetch('/api/push/subscribe').then((x) => x.json()).then(setSrv).catch(() => {});
+    if (can) navigator.serviceWorker.getRegistration('/sw.js').then((reg) => reg?.pushManager.getSubscription()).then((s) => setSub(s ?? null)).catch(() => {});
+  }, [can]);
+  if (!srv?.enabled) return null;
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const save = (body: object) => fetch('/api/push/subscribe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tz, lang, ...body }) }).then((x) => x.json());
+  async function turnOn() {
+    setBusy(true); setMsg('');
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { setMsg(r.denied); return; }
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+      const s = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64key(srv!.key!) }));
+      await save({ subscription: s.toJSON(), prefs: srv!.prefs, test: true });
+      setSub(s);
+    } catch { setMsg(r.failed); } finally { setBusy(false); }
+  }
+  async function turnOff() {
+    if (!sub) return;
+    await fetch('/api/push/subscribe', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) }).catch(() => {});
+    await sub.unsubscribe().catch(() => {});
+    setSub(null);
+  }
+  const setPrefs = (p: Partial<typeof srv.prefs>) => { const prefs = { ...srv.prefs, ...p }; setSrv({ ...srv, prefs }); save({ prefs }); };
+  return (
+    <section className="card stack">
+      <div className="label">🔔 {r.title}</div>
+      {sub ? (
+        <>
+          <p className="small"><b>{r.onHere}</b></p>
+          <label className="small">{r.before}
+            <select value={srv.prefs.before} onChange={(e) => setPrefs({ before: Number(e.target.value) })}>
+              {[10, 15, 30, 60, 120].map((n) => <option key={n} value={n}>{r.mins(n)}</option>)}
+              <option value={0}>{r.none}</option>
+            </select>
+          </label>
+          <div className="row gap" style={{ alignItems: 'center' }}>
+            <label className="row gap small" style={{ alignItems: 'center' }}><input type="checkbox" checked={srv.prefs.morning} onChange={(e) => setPrefs({ morning: e.target.checked })} /> {r.morning}</label>
+            {srv.prefs.morning && <select value={srv.prefs.morningHour} onChange={(e) => setPrefs({ morningHour: Number(e.target.value) })} aria-label={r.at}>
+              {[5, 6, 7, 8, 9, 10, 11].map((x) => <option key={x} value={x}>{`${x}:00`}</option>)}
+            </select>}
+          </div>
+          <div className="row gap">
+            <button className="ghost" onClick={() => save({ test: true })}>{r.test}</button>
+            <button className="link danger" onClick={turnOff}>{r.off}</button>
+          </div>
+          <p className="tiny">{r.note}</p>
+        </>
+      ) : inApp ? (
+        <p className="small">{r.inApp}</p>
+      ) : ios && !standalone ? (
+        <>
+          <p className="small muted">{r.pitch}</p>
+          <p className="small"><b>{r.iosH}</b></p>
+          <ol className="small steps">{r.iosSteps.map((x) => <li key={x}>{x}</li>)}</ol>
+        </>
+      ) : !can ? (
+        <p className="small">{r.noSupport}</p>
+      ) : (
+        <>
+          <p className="small muted">{r.pitch}</p>
+          <button className="primary" disabled={busy} onClick={turnOn}>🔔 {r.on}</button>
+        </>
+      )}
+      {msg && <p className="small danger" role="alert">{msg}</p>}
     </section>
   );
 }
