@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NextResponse } from 'next/server';
+import { needUser } from '@/lib/guard';
 
 export const runtime = 'nodejs';
 
@@ -36,6 +37,8 @@ Rules:
 - Reply in the language given in <lang> (en = English, zh = Simplified Chinese).`;
 
 export async function POST(req: Request) {
+  const denied = await needUser();
+  if (denied) return denied;
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return NextResponse.json({ error: 'no_key' }, { status: 503 });
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anon';

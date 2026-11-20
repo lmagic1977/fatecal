@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { accessToken, loadToken, validKey } from '@/lib/gcal';
+import { needUser } from '@/lib/guard';
 
 export const runtime = 'nodejs';
 
 // POST { key } → events from all the person's visible Google calendars, from 2 days ago to 60 days ahead.
 export async function POST(req: Request) {
+  const denied = await needUser();
+  if (denied) return denied;
   const { key } = await req.json().catch(() => ({}));
   if (!validKey(key)) return NextResponse.json({ error: 'bad_key' }, { status: 400 });
   const s = await loadToken(key);

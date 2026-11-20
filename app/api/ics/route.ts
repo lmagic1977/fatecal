@@ -1,5 +1,6 @@
 import ical from 'node-ical';
 import { NextResponse } from 'next/server';
+import { needUser } from '@/lib/guard';
 
 export const runtime = 'nodejs';
 
@@ -16,6 +17,8 @@ function allowed(raw: string): URL | null {
 }
 
 export async function POST(req: Request) {
+  const denied = await needUser();
+  if (denied) return denied;
   const { url, days = 14 } = await req.json().catch(() => ({}));
   const u = typeof url === 'string' ? allowed(url) : null;
   if (!u) return NextResponse.json({ error: 'invalid_url' }, { status: 400 });

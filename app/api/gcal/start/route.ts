@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import { REDIRECT, SCOPE, gcalEnabled, makeState, validKey } from '@/lib/gcal';
+import { needUser } from '@/lib/guard';
 
 export const runtime = 'nodejs';
 
 // GET /api/gcal/start?key=… → Google's consent screen (read-only calendar access)
 export async function GET(req: Request) {
+  if (await needUser()) return NextResponse.redirect(new URL('/?gcal=error', req.url));
   const key = new URL(req.url).searchParams.get('key');
   if (!gcalEnabled() || !validKey(key)) return NextResponse.redirect(new URL('/?gcal=error', req.url));
   const u = new URL('https://accounts.google.com/o/oauth2/v2/auth');

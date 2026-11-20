@@ -3,11 +3,14 @@ import { NextResponse } from 'next/server';
 import { INBOUND_DOMAIN, MailItem } from '@/lib/mail';
 import { addressToken, validReadKey } from '@/lib/mailkey';
 import { MONTHLY_LIMIT, readUsage } from '@/lib/quota';
+import { needUser } from '@/lib/guard';
 
 export const runtime = 'nodejs';
 
 // POST { key } -> the forwarding address for this key, plus any new mail (which is then deleted from the server).
 export async function POST(req: Request) {
+  const denied = await needUser();
+  if (denied) return denied;
   const { key, peek } = await req.json().catch(() => ({}));
   if (!validReadKey(key)) return NextResponse.json({ error: 'bad_key' }, { status: 400 });
   let token: string;
