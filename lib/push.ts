@@ -23,7 +23,10 @@ export async function allPush(): Promise<PushRec[]> {
   let cursor: string | undefined;
   do {
     const r = await list({ prefix: 'push/', cursor, limit: 1000 });
-    for (const b of r.blobs) { const rec = await readJson<PushRec>(b.pathname); if (rec?.subs?.length) out.push(rec); }
+    for (let i = 0; i < r.blobs.length; i += 50) {
+      const recs = await Promise.all(r.blobs.slice(i, i + 50).map((b) => readJson<PushRec>(b.pathname)));
+      for (const rec of recs) if (rec?.subs?.length) out.push(rec);
+    }
     cursor = r.hasMore ? r.cursor : undefined;
   } while (cursor);
   return out;

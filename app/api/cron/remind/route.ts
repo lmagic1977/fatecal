@@ -24,8 +24,10 @@ export async function GET(req: Request) {
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const recs = await allPush();
   let sent = 0;
-  for (const rec of recs) {
-    try { sent += await remindOne(rec); } catch { /* next person */ }
+  // 25 people at a time, so a few thousand fit in one run
+  for (let i = 0; i < recs.length; i += 25) {
+    const r = await Promise.all(recs.slice(i, i + 25).map((rec) => remindOne(rec).catch(() => 0)));
+    sent += r.reduce((a, b) => a + b, 0);
   }
   return NextResponse.json({ people: recs.length, sent });
 }
