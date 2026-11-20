@@ -625,6 +625,7 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
   const todays = events.filter((e) => sameDay(new Date(e.start), day)).sort((a, b) => a.start.localeCompare(b.start));
   const shift = (n: number) => setDay(new Date(day.getFullYear(), day.getMonth(), day.getDate() + n));
   const isToday = sameDay(day, new Date());
+  const rel = relDay(day, lang);
   const hr = new Date().getHours();
   const hi = v.hi[hr < 12 ? 0 : hr < 18 ? 1 : 2];
   const gz = summary.ganZhi;
@@ -643,18 +644,18 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
       <div className="daynav">
         <button className="icon" onClick={() => shift(-1)} aria-label={t.prevDay}>‹</button>
         <div className="dayhead">
-          <h1>{isToday ? `${v.todayIs} · ${dateStr}` : fmtDay(day, lang)}</h1>
+          <h1>{rel.label ? `${rel.label} · ${dateStr}` : fmtDay(day, lang)}</h1>
           <div className="gzline"><span className="han">{gz}</span>{gzName}</div>
         </div>
         <button className="icon" onClick={() => shift(1)} aria-label={t.nextDay}>›</button>
       </div>
 
       <section className="herocard">
-        <ScoreRing score={summary.score} label={t.dayScore} />
+        <ScoreRing score={summary.score} label={v.scoreOf(rel.word)} />
         <div className="grow">
           <span className={`vpill ${summary.verdict}`}><i />{t[summary.verdict]}</span>
-          <h2>{t.verdictLine[summary.verdict]}</h2>
-          {best && <p>{v.window(fmtHour(best.start, lang), fmtHour(best.start + 2, lang))}</p>}
+          <h2>{t.verdictLine[summary.verdict].replace('{w}', rel.word)}</h2>
+          {best && <p>{v.window(fmtHour(best.start, lang), fmtHour(best.start + 2, lang), rel.word)}</p>}
           <button className="link light" onClick={() => setTrad(!trad)} aria-expanded={trad}>{trad ? t.hideAlmanac : t.showAlmanac}</button>
           {trad && (
             <div className="trad">
@@ -699,7 +700,7 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
 
       {summary.reasons.length > 0 && (
         <section className="card">
-          <div className="label">{v.whyToday}</div>
+          <div className="label">{v.whyToday(rel.word)}</div>
           <ul className="whyday">
             {summary.reasons.map((r, i) => <li key={i}><span className={`em ${r.delta >= 0 ? 'p' : 'm'}`}>{r.delta >= 0 ? '↑' : '↓'}</span><span>{reasonText(r, lang)}</span></li>)}
           </ul>
@@ -786,6 +787,25 @@ function repeatText(r: CalEvent['repeat'], lang: Lang) {
   const q = T[lang].qa;
   const days = r.freq === 'weekly' && r.byDay?.length ? ` · ${r.byDay.map((d) => q.days[d]).join(lang === 'zh' ? '、' : ', ')}` : '';
   return `🔁 ${q.rep[r.freq]}${days}${r.until ? ` · ${q.until} ${r.until}` : ''}`;
+}
+
+// How a date reads next to today: 今天/明天/后天/昨天/前天, then 本周X / 下周X / 上周X (weeks start Monday), else none.
+// `word` is what the day is called inside sentences ("明天最顺的时段", "Why tomorrow feels this way").
+function relDay(day: Date, lang: Lang): { label: string; word: string } {
+  const r = T[lang].v2.rel;
+  const mid = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const now = new Date();
+  const diff = Math.round((mid(day) - mid(now)) / 86400000);
+  const byDiff: Record<number, string> = { 0: r.today, 1: r.tomorrow, 2: r.after, [-1]: r.yesterday, [-2]: r.before };
+  let label = byDiff[diff] ?? '';
+  if (!label) {
+    const monday = (d: Date) => mid(d) - ((d.getDay() + 6) % 7) * 86400000;
+    const weeks = Math.round((monday(day) - monday(now)) / (7 * 86400000));
+    const wd = lang === 'zh' ? `周${'日一二三四五六'[day.getDay()]}` : day.toLocaleDateString(tLocale(lang), { weekday: 'long' });
+    label = weeks === 0 ? r.thisW(wd) : weeks === 1 ? r.nextW(wd) : weeks === -1 ? r.lastW(wd) : '';
+  }
+  const word = label ? r.word(label) : L3(lang, 'this day', '这天', 'este día');
+  return { label, word };
 }
 
 function QuickAdd({ lang, chart, events, onAdd }: { lang: Lang; chart: Chart; events: CalEvent[]; onAdd: (evs: CalEvent[]) => void }) {
