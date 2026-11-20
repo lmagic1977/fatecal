@@ -15,7 +15,7 @@ function limited(key: string, max: number, ms: number) {
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
-  const lang = body?.lang === 'zh' ? 'zh' : 'en';
+  const lang = body?.lang === 'zh' ? 'zh' : body?.lang === 'es' ? 'es' : 'en';
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anon';
   if (limited(`ip:${ip}`, 8, 10 * 60_000)) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
 

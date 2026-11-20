@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  BirthInput, CalEvent, Category, Chart, computeChart, readEvent, scoreDay, dayActivities, activityName, STEM, BRANCH, ELEMENT_NAME, Element, HIDDEN,
+  BirthInput, CalEvent, Category, Chart, computeChart, readEvent, scoreDay, dayActivities, activityName, reasonText, ANIMAL_ES, STEM, BRANCH, ELEMENT_NAME, Element, HIDDEN,
 } from '@/lib/engine';
 import { T, Lang, almanac } from '@/lib/i18n';
 import { buildContext, fallbackAnswer, fmtDay, fmtHour } from '@/lib/bot';
@@ -11,6 +11,7 @@ import { signIn, signOut } from 'next-auth/react';
 import ShoppingResources from '@/components/ShoppingResources';
 import { CONTACT_EMAIL, ACCOUNTS_ON, SHOPPING_ON } from '@/lib/site';
 import type { MailItem } from '@/lib/mail';
+import { expandRepeats, dateKey } from '@/lib/recur';
 import { LIMITS, PRICES, TRIAL_DAYS, money, type Interval, type Limits, type Plan } from '@/lib/plans';
 
 // ---------------- billing ----------------
@@ -48,7 +49,9 @@ function load<T>(k: string, fallback: T): T {
 function save(k: string, v: unknown) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } }
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
-const tLocale = (lang: Lang) => (lang === 'zh' ? 'zh-CN' : 'en-US');
+const tLocale = (lang: Lang) => (lang === 'zh' ? 'zh-CN' : lang === 'es' ? 'es-ES' : 'en-US');
+// pick the string for the current language
+const L3 = <A,>(lang: Lang, en: A, zh: A, es: A) => (lang === 'zh' ? zh : lang === 'es' ? es : en);
 const fmtTime = (iso: string, lang: Lang) => new Date(iso).toLocaleTimeString(tLocale(lang), { hour: 'numeric', minute: '2-digit' });
 const pad = (n: number) => String(n).padStart(2, '0');
 const isoLocalDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -71,7 +74,7 @@ export default function App({ initialLang = "en" }: { initialLang?: Lang }) {
   const [lang, setLangState] = useState<Lang>(initialLang);
   // null = follow the phone/computer language; 'en' | 'zh' = the person chose it (kept and synced)
   const [langPick, setLangPick] = useState<Lang | null>(null);
-  useEffect(() => { document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en'; }, [lang]);
+  useEffect(() => { document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang; }, [lang]);
   const setLang = (l: Lang) => { setLangState(l); setLangPick(l); save(K.langPick, l); };
   const [profile, setProfile] = useState<Profile | null>(null);
   const [manual, setManual] = useState<CalEvent[]>([]);
@@ -181,7 +184,7 @@ export default function App({ initialLang = "en" }: { initialLang?: Lang }) {
         setProfile(d.profile); save(K.profile, d.profile);
         if (Array.isArray(d.events)) setManual(d.events);
         if (d.icsUrl && !ics?.url) setIcs({ url: d.icsUrl, events: [] });
-        if ((d.langPick === 'en' || d.langPick === 'zh') && !load<Lang | null>(K.langPick, null)) { setLangState(d.langPick); setLangPick(d.langPick); save(K.langPick, d.langPick); }
+        if ((d.langPick === 'en' || d.langPick === 'zh' || d.langPick === 'es') && !load<Lang | null>(K.langPick, null)) { setLangState(d.langPick); setLangPick(d.langPick); save(K.langPick, d.langPick); }
         if (d.mailKey && !mailKey) { save(K.mailKey, d.mailKey); setMailKey(d.mailKey); }
         if (d.gcalKey && !gcalKey) { save(K.gcalKey, d.gcalKey); setGcalKey(d.gcalKey); refreshGcal(d.gcalKey); }
       }
@@ -193,7 +196,7 @@ export default function App({ initialLang = "en" }: { initialLang?: Lang }) {
   useEffect(() => {
     if (!ready || !account || !synced.current || !profile) return;
     const id = setTimeout(() => {
-      fetch('/api/sync', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ v: 1, updatedAt: new Date().toISOString(), profile, events: manual, icsUrl: ics?.url ?? null, lang, langPick, mailKey, gcalKey }) }).catch(() => {});
+      fetch('/api/sync', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ v: 1, updatedAt: new Date().toISOString(), profile, events: manual, icsUrl: ics?.url ?? null, lang, langPick, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, mailKey, gcalKey }) }).catch(() => {});
     }, 1500);
     return () => clearTimeout(id);
   }, [ready, account, profile, manual, ics?.url, lang, langPick, mailKey, gcalKey]);
@@ -209,6 +212,19 @@ export default function App({ initialLang = "en" }: { initialLang?: Lang }) {
     if (j.items?.length) setMail((m) => [...m, ...j.items.filter((x: MailItem) => !m.some((y) => y.id === x.id))]);
     return j.items?.length ?? 0;
   }
+  // Events added from WhatsApp wait on the server; pick them up on start, every minute and when the app comes back.
+  useEffect(() => {
+    if (!ready || authed !== 'in') return;
+    const pull = () => fetch('/api/pending').then((r) => (r.ok ? r.json() : null)).then((j) => {
+      const evs: CalEvent[] = j?.events ?? [];
+      if (evs.length) setManual((m) => [...m, ...evs.filter((e) => !m.some((x) => x.id === e.id))]);
+    }).catch(() => {});
+    pull();
+    const id = setInterval(pull, 60000);
+    const vis = () => { if (document.visibilityState === 'visible') pull(); };
+    document.addEventListener('visibilitychange', vis);
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', vis); };
+  }, [ready, authed]);
   useEffect(() => {
     if (!ready || !mailKey) return;
     checkMail();
@@ -237,13 +253,29 @@ export default function App({ initialLang = "en" }: { initialLang?: Lang }) {
   const mailEvents = useMemo(() => (mail.map(mailToEvent).filter(Boolean) as CalEvent[])
     .filter((e) => mailEdits[e.id] !== null)
     .map((e) => (mailEdits[e.id] ? { ...e, ...mailEdits[e.id]! } : e)), [mail, mailEdits]);
-  const events = useMemo(() => [...manual, ...(ics?.events ?? []), ...(gcal?.events ?? []), ...mailEvents].sort((a, b) => a.start.localeCompare(b.start)), [manual, ics, gcal, mailEvents]);
+  const manualExpanded = useMemo(() => {
+    const now = new Date();
+    return expandRepeats(manual, new Date(now.getFullYear(), now.getMonth() - 3, 1), new Date(now.getFullYear() + 1, now.getMonth() + 1, 1));
+  }, [manual]);
+  const events = useMemo(() => [...manualExpanded, ...(ics?.events ?? []), ...(gcal?.events ?? []), ...mailEvents].sort((a, b) => a.start.localeCompare(b.start)), [manualExpanded, ics, gcal, mailEvents]);
   // move or remove any event the user owns in FateCal: ones they added, and ones that came from email
   const moveEvent = (e: CalEvent, start: string, end: string) => {
+    // one occurrence of a repeating series: skip that date in the series and add a one-off at the new time
+    if (e.source === 'manual' && e.seriesId) {
+      const key = dateKey(new Date(e.start));
+      setManual([...manual.map((m) => (m.id === e.seriesId ? { ...m, exdates: [...(m.exdates ?? []), key] } : m)),
+        { ...e, id: `m${Date.now()}`, seriesId: undefined, repeat: undefined, start, end }]);
+      return;
+    }
     if (e.source === 'manual') setManual(manual.map((m) => (m.id === e.id ? { ...m, start, end } : m)));
     else if (e.source === 'email') setMailEdits({ ...mailEdits, [e.id]: { start, end } });
   };
-  const removeEvent = (e: CalEvent) => {
+  const removeEvent = (e: CalEvent, all = false) => {
+    if (e.source === 'manual' && e.seriesId) {
+      if (all) setManual(manual.filter((m) => m.id !== e.seriesId));
+      else setManual(manual.map((m) => (m.id === e.seriesId ? { ...m, exdates: [...(m.exdates ?? []), dateKey(new Date(e.start))] } : m)));
+      return;
+    }
     if (e.source === 'manual') setManual(manual.filter((m) => m.id !== e.id));
     else if (e.source === 'email') setMailEdits({ ...mailEdits, [e.id]: null });
   };
@@ -273,7 +305,7 @@ export default function App({ initialLang = "en" }: { initialLang?: Lang }) {
     <div className="shell">
       <header className="top">
         <Logo />
-        <button className="lang" onClick={() => setLang(lang === 'en' ? 'zh' : 'en')} aria-label="Switch language">{lang === 'en' ? '中文' : 'EN'}</button>
+        <LangMenu lang={lang} setLang={setLang} />
       </header>
       <main className="main">
         {tab === 'today' && <Today lang={lang} chart={chart} events={events} manual={manual} setManual={setManual} name={profile.name} onMove={moveEvent} onRemove={removeEvent} />}
@@ -353,6 +385,7 @@ function Onboarding({ lang, setLang, initial, onDone, onCancel, account = null, 
           <div className="seg">
             <button className={lang === 'en' ? 'on' : ''} onClick={() => setLang('en')}>English</button>
             <button className={lang === 'zh' ? 'on' : ''} onClick={() => setLang('zh')}>中文</button>
+            <button className={lang === 'es' ? 'on' : ''} onClick={() => setLang('es')}>Español</button>
           </div>
         </div>
       )}
@@ -369,6 +402,15 @@ function Logo({ big = false }: { big?: boolean }) {
   return <img className={big ? 'logo big' : 'logo'} src="/logo.svg" alt="FateCal" width={big ? 172 : 115} height={big ? 42 : 28} />;
 }
 
+// Header language picker
+function LangMenu({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void }) {
+  return (
+    <select className="lang langsel" value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label="Language / 语言 / Idioma">
+      <option value="en">EN</option><option value="zh">中文</option><option value="es">ES</option>
+    </select>
+  );
+}
+
 function Landing({ lang, setLang, providers, onDone }: { lang: Lang; setLang: (l: Lang) => void; providers: string[]; onDone: (p: Profile) => void }) {
   const t = T[lang];
   const l = t.lp;
@@ -379,7 +421,7 @@ function Landing({ lang, setLang, providers, onDone }: { lang: Lang; setLang: (l
     <div className="shell onboard">
       <header className="top">
         <Logo />
-        <button className="lang" onClick={() => setLang(lang === 'en' ? 'zh' : 'en')} aria-label="Switch language">{lang === 'en' ? '中文' : 'EN'}</button>
+        <LangMenu lang={lang} setLang={setLang} />
       </header>
       <PromoBanner lang={lang} />
       <div className="hero">
@@ -445,6 +487,7 @@ function Landing({ lang, setLang, providers, onDone }: { lang: Lang; setLang: (l
         <div className="seg">
           <button className={lang === 'en' ? 'on' : ''} onClick={() => setLang('en')}>English</button>
           <button className={lang === 'zh' ? 'on' : ''} onClick={() => setLang('zh')}>中文</button>
+          <button className={lang === 'es' ? 'on' : ''} onClick={() => setLang('es')}>Español</button>
         </div>
       </section>
       {ACCOUNTS_ON ? <SignUp lang={lang} providers={providers} /> : <Onboarding lang={lang} setLang={setLang} initial={null} onDone={onDone} embedded />}
@@ -461,7 +504,7 @@ function SignUp({ lang, providers }: { lang: Lang; providers: string[] }) {
   const [mode, setMode] = useState<'pick' | 'email' | 'phone'>('pick');
   const [step, setStep] = useState<'enter' | 'code'>('enter');
   const [email, setEmail] = useState('');
-  const [dial, setDial] = useState(lang === 'zh' ? '+86' : '+1');
+  const [dial, setDial] = useState(lang === 'zh' ? '+86' : lang === 'es' ? '+52' : '+1');
   const [num, setNum] = useState('');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -532,7 +575,7 @@ function SignUp({ lang, providers }: { lang: Lang; providers: string[] }) {
         </form>
       )}
       {err && <p className="danger small" role="alert">{err}</p>}
-      <p className="tiny muted">{t.agree} <a href="/terms">{lang === 'zh' ? '服务条款' : 'Terms'}</a> {t.and} <a href="/privacy">{lang === 'zh' ? '隐私政策' : 'Privacy Policy'}</a>.</p>
+      <p className="tiny muted">{t.agree} <a href="/terms">{L3(lang, 'Terms', '服务条款', 'Términos')}</a> {t.and} <a href="/privacy">{L3(lang, 'Privacy Policy', '隐私政策', 'Política de privacidad')}</a>.</p>
     </section>
   );
 }
@@ -551,7 +594,7 @@ function VerdictTag({ v, lang }: { v: 'good' | 'neutral' | 'bad'; lang: Lang }) 
 }
 
 const CAT_EMOJI: Partial<Record<Category, string>> = { meeting: '🤝', signing: '✍️', travel: '✈️', opening: '🚀', money: '💸', moving: '🏠', romance: '💞', medical: '🩺', haircut: '✂️', study: '📚', build: '🛠️', wedding: '💍', cleaning: '🧹' };
-const shortHour = (h: number, lang: Lang) => (lang === 'zh' ? `${h % 24}点` : `${((h + 11) % 12) + 1}${h % 24 < 12 ? 'a' : 'p'}`);
+const shortHour = (h: number, lang: Lang) => (lang === 'zh' ? `${h % 24}点` : lang === 'es' ? `${h % 24}h` : `${((h + 11) % 12) + 1}${h % 24 < 12 ? 'a' : 'p'}`);
 
 function ScoreRing({ score, label }: { score: number; label: string }) {
   const r = 46, c = 2 * Math.PI * r;
@@ -566,7 +609,7 @@ function ScoreRing({ score, label }: { score: number; label: string }) {
   );
 }
 
-function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove }: { lang: Lang; chart: Chart; events: CalEvent[]; manual: CalEvent[]; setManual: (e: CalEvent[]) => void; name: string; onMove: (e: CalEvent, s: string, en: string) => void; onRemove: (e: CalEvent) => void }) {
+function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove }: { lang: Lang; chart: Chart; events: CalEvent[]; manual: CalEvent[]; setManual: (e: CalEvent[]) => void; name: string; onMove: (e: CalEvent, s: string, en: string) => void; onRemove: (e: CalEvent, all?: boolean) => void }) {
   const t = T[lang];
   const v = t.v2;
   const limits = useBill().info.limits;
@@ -583,7 +626,7 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
   const hr = new Date().getHours();
   const hi = v.hi[hr < 12 ? 0 : hr < 18 ? 1 : 2];
   const gz = summary.ganZhi;
-  const gzName = lang === 'zh' ? `${ELEMENT_NAME[STEM[gz[0]].el].zh}${BRANCH[gz[1]].zh}日` : `${ELEMENT_NAME[STEM[gz[0]].el].en} ${BRANCH[gz[1]].animal} day · ${STEM[gz[0]].pinyin}-${BRANCH[gz[1]].pinyin}`;
+  const gzName = lang === 'zh' ? `${ELEMENT_NAME[STEM[gz[0]].el].zh}${BRANCH[gz[1]].zh}日` : lang === 'es' ? `Día ${ANIMAL_ES[BRANCH[gz[1]].animal]} de ${ELEMENT_NAME[STEM[gz[0]].el].es} · ${STEM[gz[0]].pinyin}-${BRANCH[gz[1]].pinyin}` : `${ELEMENT_NAME[STEM[gz[0]].el].en} ${BRANCH[gz[1]].animal} day · ${STEM[gz[0]].pinyin}-${BRANCH[gz[1]].pinyin}`;
   const dateStr = day.toLocaleDateString(tLocale(lang), { month: lang === 'zh' ? 'long' : 'short', day: 'numeric' });
   const best = summary.bestHours[0];
   const hs = summary.hours.map((h) => h.score);
@@ -594,6 +637,7 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
   return (
     <div className="stack">
       <div className="greet">{hi}{name ? (lang === 'zh' ? `，${name}` : `, ${name}`) : ''} 👋</div>
+      <QuickAdd lang={lang} chart={chart} events={events} onAdd={(evs) => { setManual([...manual, ...evs]); const d = new Date(evs[0].start); if (!sameDay(d, day)) setDay(d); }} />
       <div className="daynav">
         <button className="icon" onClick={() => shift(-1)} aria-label={t.prevDay}>‹</button>
         <div className="dayhead">
@@ -612,8 +656,8 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
           <button className="link light" onClick={() => setTrad(!trad)} aria-expanded={trad}>{trad ? t.hideAlmanac : t.showAlmanac}</button>
           {trad && (
             <div className="trad">
-              <p><b>{lang === 'zh' ? '宜' : 'Almanac yi'}:</b> {summary.yi.map((w) => almanac(w, lang)).join(sep)}</p>
-              <p><b>{lang === 'zh' ? '忌' : 'Almanac ji'}:</b> {summary.ji.map((w) => almanac(w, lang)).join(sep)}</p>
+              <p><b>{L3(lang, 'Almanac yi', '宜', 'Almanaque: sí')}:</b> {summary.yi.map((w) => almanac(w, lang)).join(sep)}</p>
+              <p><b>{L3(lang, 'Almanac ji', '忌', 'Almanaque: no')}:</b> {summary.ji.map((w) => almanac(w, lang)).join(sep)}</p>
             </div>
           )}
         </div>
@@ -655,7 +699,7 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
         <section className="card">
           <div className="label">{v.whyToday}</div>
           <ul className="whyday">
-            {summary.reasons.map((r, i) => <li key={i}><span className={`em ${r.delta >= 0 ? 'p' : 'm'}`}>{r.delta >= 0 ? '↑' : '↓'}</span><span>{lang === 'zh' ? r.zh : r.en}</span></li>)}
+            {summary.reasons.map((r, i) => <li key={i}><span className={`em ${r.delta >= 0 ? 'p' : 'm'}`}>{r.delta >= 0 ? '↑' : '↓'}</span><span>{reasonText(r, lang)}</span></li>)}
           </ul>
         </section>
       )}
@@ -670,7 +714,7 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
       {todays.map((e) => (
         <EventCard key={e.id} lang={lang} chart={chart} ev={e} all={events}
           onMove={(s, en) => { onMove(e, s, en); flash(v.movedToast); }}
-          onDelete={() => { if (e.source !== 'email' || confirm(t.v2.removeMailConfirm)) onRemove(e); }} />
+          onDelete={() => { if (e.seriesId) { onRemove(e, confirm(t.qa.delSeries)); return; } if (e.source !== 'email' || confirm(t.v2.removeMailConfirm)) onRemove(e); }} />
       ))}
       <button className="addbig" onClick={() => setAdding(true)}>+ {v.addOrConnect}</button>
       {adding && <AddEvent lang={lang} day={day} onSave={(e) => {
@@ -698,9 +742,9 @@ function MonthCal({ lang, chart, events, day, setDay }: { lang: Lang; chart: Cha
     return c;
   }, [events, y, m]);
   const today = new Date();
-  const week = lang === 'zh' ? ['日', '一', '二', '三', '四', '五', '六'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const week = L3(lang, ['S', 'M', 'T', 'W', 'T', 'F', 'S'], ['日', '一', '二', '三', '四', '五', '六'], ['D', 'L', 'M', 'X', 'J', 'V', 'S']);
   const cells: (number | null)[] = [...Array(first.getDay()).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
-  const title = first.toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US', { year: 'numeric', month: 'long' });
+  const title = first.toLocaleDateString(tLocale(lang), { year: 'numeric', month: 'long' });
   return (
     <section className="card month">
       <div className="row between">
@@ -716,7 +760,7 @@ function MonthCal({ lang, chart, events, day, setDay }: { lang: Lang; chart: Cha
               <button key={d} role="gridcell"
                 className={`md ${verdicts[d - 1]} ${d === day.getDate() ? 'sel' : ''} ${sameDay(new Date(y, m, d), today) ? 'today' : ''}`}
                 onClick={() => setDay(new Date(y, m, d))}
-                aria-label={`${new Date(y, m, d).toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US', { month: 'long', day: 'numeric' })}, ${t[verdicts[d - 1]]}${counts[d] ? `, ${counts[d]} ${t.eventsWord}` : ''}`}>
+                aria-label={`${new Date(y, m, d).toLocaleDateString(tLocale(lang), { month: 'long', day: 'numeric' })}, ${t[verdicts[d - 1]]}${counts[d] ? `, ${counts[d]} ${t.eventsWord}` : ''}`}>
                 <span className="n">{d}</span>
                 {counts[d] ? <span className="ev">{counts[d]}</span> : <span className="ev none" />}
               </button>
@@ -731,6 +775,122 @@ function MonthCal({ lang, chart, events, day, setDay }: { lang: Lang; chart: Cha
   );
 }
 
+// ---------------- quick add: one sentence (typed or spoken) → events ----------------
+
+type Draft = CalEvent & { assumed?: string; orig?: { start: string; end: string } };
+
+function repeatText(r: CalEvent['repeat'], lang: Lang) {
+  if (!r) return '';
+  const q = T[lang].qa;
+  const days = r.freq === 'weekly' && r.byDay?.length ? ` · ${r.byDay.map((d) => q.days[d]).join(lang === 'zh' ? '、' : ', ')}` : '';
+  return `🔁 ${q.rep[r.freq]}${days}${r.until ? ` · ${q.until} ${r.until}` : ''}`;
+}
+
+function QuickAdd({ lang, chart, events, onAdd }: { lang: Lang; chart: Chart; events: CalEvent[]; onAdd: (evs: CalEvent[]) => void }) {
+  const q = T[lang].qa;
+  const t = T[lang];
+  const { upgrade } = useBill();
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [limitHit, setLimitHit] = useState(false);
+  const [drafts, setDrafts] = useState<Draft[] | null>(null);
+  const recRef = useRef<any>(null);
+
+  async function send(said = text) {
+    if (!said.trim() || busy) return;
+    setBusy(true); setMsg(''); setLimitHit(false);
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const r = await fetch('/api/parse', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: said, tz, lang }) }).catch(() => null);
+    const j = r ? await r.json().catch(() => null) : null;
+    setBusy(false);
+    if (r?.status === 429) { setMsg(q.limit(j?.limit ?? 5)); setLimitHit(true); return; }
+    if (!r?.ok || !j) { setMsg(q.failed); return; }
+    if (!j.events?.length) { setMsg(j.question || q.none); return; }
+    setDrafts(j.events.map((e: any, i: number) => ({ ...e, id: `q${Date.now()}${i}`, source: 'manual', via: 'ai' })));
+  }
+
+  function mic() {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) { setMsg(q.micNo); return; }
+    if (listening) { recRef.current?.stop(); return; }
+    const rec = new SR();
+    rec.lang = tLocale(lang);
+    rec.interimResults = true;
+    let final = '';
+    rec.onresult = (ev: any) => {
+      let s = '';
+      for (let i = 0; i < ev.results.length; i++) s += ev.results[i][0].transcript;
+      setText(s);
+      if (ev.results[ev.results.length - 1].isFinal) final = s;
+    };
+    rec.onerror = () => { setListening(false); setMsg(q.micNo); };
+    rec.onend = () => { setListening(false); if (final.trim()) send(final); };
+    recRef.current = rec;
+    setMsg(''); setListening(true);
+    try { rec.start(); } catch { setListening(false); setMsg(q.micNo); }
+  }
+
+  const when = (d: Draft) => d.allDay
+    ? `${fmtDay(new Date(d.start), lang)} · ${q.allDay}`
+    : `${fmtDay(new Date(d.start), lang)} ${fmtTime(d.start, lang)}–${fmtTime(d.end, lang)}`;
+
+  return (
+    <section className="card quickadd">
+      <form className="qa-row" onSubmit={(e) => { e.preventDefault(); send(); }}>
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder={listening ? q.listening : q.ph} aria-label={q.ph} enterKeyHint="send" />
+        <button type="button" className={`qa-mic ${listening ? 'on' : ''}`} onClick={mic} aria-label={q.mic} aria-pressed={listening}>🎤</button>
+        <button className="primary qa-go" disabled={busy || !text.trim()}>{busy ? '…' : q.add}</button>
+      </form>
+      {busy && <p className="tiny" aria-live="polite">{q.thinking}</p>}
+      {msg && <p className="small" role="status">{msg} {limitHit && <button className="link" onClick={() => upgrade('basic', 'year')}>{t.bill.upgrade(t.bill.basic)}</button>}</p>}
+      {drafts && (
+        <div className="sheet-bg" onClick={(e) => { if (e.target === e.currentTarget) setDrafts(null); }}>
+          <div className="sheet form" role="dialog" aria-modal="true" aria-labelledby="qa-h">
+            <span className="grab" aria-hidden="true" />
+            <h3 id="qa-h">{q.found(drafts.length)}</h3>
+            {drafts.map((d, i) => {
+              const r = readEvent(chart, d, events);
+              const alt = r.alternatives[0];
+              const set = (patch: Partial<Draft>) => setDrafts(drafts.map((x, k) => (k === i ? { ...x, ...patch } : x)));
+              return (
+                <div key={d.id} className="qa-item">
+                  <div className="row between top-align gap">
+                    <div>
+                      <div className="ev-title">{d.title}</div>
+                      <div className="small muted">{when(d)}</div>
+                      {d.repeat && <div className="small">{repeatText(d.repeat, lang)}</div>}
+                      {d.assumed && <div className="tiny">💡 {q.guessed}: {d.assumed}</div>}
+                    </div>
+                    <span className={`vscore ${r.verdict}`}>{t[r.verdict]} {r.score}</span>
+                  </div>
+                  <div className="row gap wrap" style={{ marginTop: 8 }}>
+                    {d.orig
+                      ? <><span className="small">{q.usingBetter}</span><button type="button" className="link" onClick={() => set({ start: d.orig!.start, end: d.orig!.end, orig: undefined })}>{q.undo}</button></>
+                      : !d.allDay && alt && r.verdict !== 'good' && !d.repeat && (
+                        <button type="button" className="softbtn" onClick={() => set({ start: alt.start, end: alt.end, orig: { start: d.start, end: d.end } })}>
+                          ⇢ {q.useBetter(`${sameDay(new Date(alt.start), new Date(d.start)) ? '' : fmtDay(new Date(alt.start), lang) + ' '}${fmtTime(alt.start, lang)}`, alt.score)}
+                        </button>)}
+                    {drafts.length > 1 && <button type="button" className="link danger" onClick={() => setDrafts(drafts.filter((_, k) => k !== i))}>{q.remove}</button>}
+                  </div>
+                </div>
+              );
+            })}
+            <div className="row gap">
+              <button className="primary grow" onClick={() => {
+                onAdd(drafts.map(({ assumed, orig, ...e }) => ({ ...e, id: `m${Date.now()}${Math.random().toString(36).slice(2, 6)}` })));
+                setMsg(q.saved(drafts.length)); setDrafts(null); setText('');
+              }}>{q.saveAll(drafts.length)}</button>
+              <button type="button" className="ghost" onClick={() => setDrafts(null)}>{t.cancel}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function AddEvent({ lang, day, onSave, onCancel }: { lang: Lang; day: Date; onSave: (e: CalEvent) => void; onCancel: () => void }) {
   const t = T[lang];
   const v = t.v2;
@@ -739,6 +899,7 @@ function AddEvent({ lang, day, onSave, onCancel }: { lang: Lang; day: Date; onSa
   const [date, setDate] = useState(isoLocalDate(day));
   const [from, setFrom] = useState('14:00');
   const [to, setTo] = useState('15:00');
+  const [rep, setRep] = useState<'' | 'daily' | 'weekly' | 'monthly'>('');
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel(); };
     window.addEventListener('keydown', k);
@@ -751,7 +912,7 @@ function AddEvent({ lang, day, onSave, onCancel }: { lang: Lang; day: Date; onSa
         if (!title.trim()) return;
         const s = new Date(`${date}T${from}`), en = new Date(`${date}T${to}`);
         if (en <= s) en.setTime(s.getTime() + 3600e3);
-        onSave({ id: `m${Date.now()}`, title: title.trim(), start: s.toISOString(), end: en.toISOString(), source: 'manual' });
+        onSave({ id: `m${Date.now()}`, title: title.trim(), start: s.toISOString(), end: en.toISOString(), source: 'manual', ...(rep ? { repeat: { freq: rep } } : {}) });
       }}>
         <span className="grab" aria-hidden="true" />
         <h3 id="sheet-h">{v.newEvent}</h3>
@@ -760,12 +921,20 @@ function AddEvent({ lang, day, onSave, onCancel }: { lang: Lang; day: Date; onSa
             <button type="button" key={k} className={kind === k ? 'on' : ''} onClick={() => { setKind(k); setTitle(v.quickTitle[k]); }}>{em} {k}</button>
           ))}
         </div>
-        <label>{t.title}<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={lang === 'zh' ? '和张总谈合作' : 'Partnership talk with Mr. Zhang'} required autoFocus /></label>
+        <label>{t.title}<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={L3(lang, 'Partnership talk with Mr. Zhang', '和张总谈合作', 'Reunión con la Sra. García')} required autoFocus /></label>
         <label>{t.date}<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
         <div className="row gap">
           <label className="grow">{t.from}<input type="time" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
           <label className="grow">{t.to}<input type="time" value={to} onChange={(e) => setTo(e.target.value)} /></label>
         </div>
+        <label>{t.qa.repeat}
+          <select value={rep} onChange={(e) => setRep(e.target.value as typeof rep)}>
+            <option value="">{t.qa.never}</option>
+            <option value="daily">{t.qa.rep.daily}</option>
+            <option value="weekly">{t.qa.rep.weekly}</option>
+            <option value="monthly">{t.qa.rep.monthly}</option>
+          </select>
+        </label>
         <div className="row gap">
           <button className="primary grow">{t.save}</button>
           <button type="button" className="ghost" onClick={onCancel}>{t.cancel}</button>
@@ -784,20 +953,22 @@ function EventCard({ lang, chart, ev, all, onMove, onDelete }: { lang: Lang; cha
   // lead with what is specific to this event: the almanac for its activity, then its hour, then the day
   const rank = (x: { scope: string }) => (x.scope.startsWith('almanac') ? 0 : x.scope === 'hour' ? 1 : 2);
   const tops = [...r.reasons].sort((a, b) => rank(a) - rank(b) || Math.abs(b.delta) - Math.abs(a.delta)).slice(0, 2);
-  const actLabel = r.category === 'general' ? '' : (lang === 'zh' ? `${activityName(r.category, lang)}：` : `For ${activityName(r.category, lang)}: `);
+  const actLabel = r.category === 'general' ? '' : L3(lang, `For ${activityName(r.category, lang)}: `, `${activityName(r.category, lang)}：`, `Para ${activityName(r.category, lang)}: `);
   const alt = r.alternatives[0];
   const sameD = alt ? sameDay(new Date(alt.start), new Date(ev.start)) : false;
   const altLabel = alt ? `${sameD ? '' : fmtDay(new Date(alt.start), lang) + ' '}${fmtTime(alt.start, lang)}` : '';
   const note = alt
-    ? lang === 'zh'
+    ? lang === 'es'
+      ? `¡Hola! ¿Podríamos mover «${ev.title}» del ${fmtDay(new Date(ev.start), lang)} ${fmtTime(ev.start, lang)} al ${fmtDay(new Date(alt.start), lang)} ${fmtTime(alt.start, lang)}? ¡Gracias!`
+      : lang === 'zh'
       ? `您好，「${ev.title}」原定 ${fmtDay(new Date(ev.start), lang)} ${fmtTime(ev.start, lang)}，可否改到 ${fmtDay(new Date(alt.start), lang)} ${fmtTime(alt.start, lang)}？谢谢！`
       : `Hi! Could we move "${ev.title}" from ${fmtDay(new Date(ev.start), lang)} ${fmtTime(ev.start, lang)} to ${fmtDay(new Date(alt.start), lang)} ${fmtTime(alt.start, lang)}? Thanks!`
     : '';
   const st = new Date(ev.start);
   const tb = ev.allDay
-    ? { a: lang === 'zh' ? '全天' : 'All', b: lang === 'zh' ? '' : 'day' }
-    : lang === 'zh'
-      ? { a: `${st.getHours()}:${pad(st.getMinutes())}`, b: st.getHours() < 12 ? '上午' : '下午' }
+    ? { a: L3(lang, 'All', '全天', 'Todo'), b: L3(lang, 'day', '', 'el día') }
+    : lang !== 'en'
+      ? { a: `${st.getHours()}:${pad(st.getMinutes())}`, b: lang === 'es' ? (st.getHours() < 12 ? 'mañana' : st.getHours() < 20 ? 'tarde' : 'noche') : st.getHours() < 12 ? '上午' : '下午' }
       : { a: `${((st.getHours() + 11) % 12) + 1}:${pad(st.getMinutes())}`, b: st.getHours() < 12 ? 'AM' : 'PM' };
   const full = useBill().info.limits.fullReasons;
   const showMove = full && !ev.allDay && !!alt && r.verdict !== 'good';
@@ -811,8 +982,9 @@ function EventCard({ lang, chart, ev, all, onMove, onDelete }: { lang: Lang; cha
             <div className="ev-title">{ev.title}</div>
             <span className={`vscore ${r.verdict}`}>{t[r.verdict]} {r.score}</span>
           </div>
+          {ev.seriesId && <div className="srctag">{repeatText(ev.repeat, lang)}</div>}
           {ev.source !== 'manual' && <div className="srctag">{ev.source === 'email' ? `📧 ${v.fromMail}${ev.from ? ` · ${ev.from.split('@').pop()}` : ''}` : `🗓️ ${v.fromCal}`}</div>}
-          {tops.length > 0 && <div className="evline">{actLabel}{tops.map((x) => (lang === 'zh' ? x.zh : x.en)).join(' ')}</div>}
+          {tops.length > 0 && <div className="evline">{actLabel}{tops.map((x) => reasonText(x, lang)).join(' ')}</div>}
           {!ev.allDay && r.verdict === 'good' && alt && <div className="evline">{t.evenBetter} <b>{altLabel}</b> ({alt.score})</div>}
           {!ev.allDay && r.verdict === 'bad' && !alt && <div className="evline">{t.noBetter}</div>}
         </div>
@@ -831,9 +1003,9 @@ function EventCard({ lang, chart, ev, all, onMove, onDelete }: { lang: Lang; cha
       {why && (
         <div className="whybox">
           <ul>
-            {r.reasons.map((x, i) => <li key={i}><span className={x.delta >= 0 ? 'plus' : 'minus'}>{x.delta >= 0 ? '+' : ''}{x.delta}</span> {lang === 'zh' ? x.zh : x.en}</li>)}
+            {r.reasons.map((x, i) => <li key={i}><span className={x.delta >= 0 ? 'plus' : 'minus'}>{x.delta >= 0 ? '+' : ''}{x.delta}</span> {reasonText(x, lang)}</li>)}
           </ul>
-          <p className="tiny" style={{ marginTop: 6 }}>{lang === 'zh' ? `综合 ${r.score} 分 · 日 ${r.dayGanZhi} · 时 ${r.hourGanZhi}` : `Score ${r.score} · ${STEM[r.dayGanZhi[0]].pinyin}-${BRANCH[r.dayGanZhi[1]].pinyin} day · ${BRANCH[r.hourGanZhi[1]].animal} hour`}</p>
+          <p className="tiny" style={{ marginTop: 6 }}>{lang === 'zh' ? `综合 ${r.score} 分 · 日 ${r.dayGanZhi} · 时 ${r.hourGanZhi}` : lang === 'es' ? `Puntuación ${r.score} · día ${STEM[r.dayGanZhi[0]].pinyin}-${BRANCH[r.dayGanZhi[1]].pinyin} · hora del ${ANIMAL_ES[BRANCH[r.hourGanZhi[1]].animal]}` : `Score ${r.score} · ${STEM[r.dayGanZhi[0]].pinyin}-${BRANCH[r.dayGanZhi[1]].pinyin} day · ${BRANCH[r.hourGanZhi[1]].animal} hour`}</p>
         </div>
       )}
     </article>
@@ -885,7 +1057,7 @@ function Ask({ lang, chart, events, profile, seed, clearSeed }: { lang: Lang; ch
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) return;
     const rec = new SR();
-    rec.lang = lang === 'zh' ? 'zh-CN' : 'en-US';
+    rec.lang = tLocale(lang);
     rec.interimResults = true;
     rec.continuous = false;
     const base = q ? q + ' ' : '';
@@ -901,7 +1073,7 @@ function Ask({ lang, chart, events, profile, seed, clearSeed }: { lang: Lang; ch
     const pic = given === undefined ? photo : given;
     if ((!question.trim() && !pic) || busy) return;
     const history = msgs;
-    setMsgs([...history, { role: 'user', text: question || (lang === 'zh' ? '帮我看看这张图' : 'What about this photo?'), image: pic?.preview }, { role: 'assistant', text: '' }]);
+    setMsgs([...history, { role: 'user', text: question || L3(lang, 'What about this photo?', '帮我看看这张图', '¿Qué opinas de esta foto?'), image: pic?.preview }, { role: 'assistant', text: '' }]);
     setQ('');
     setPhoto(null);
     setBusy(true);
@@ -1014,8 +1186,8 @@ function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Ch
   const nextOk = useBill().info.limits.nextYearStars;
   const [yearLocked, setYearLocked] = useState(false);
   const zh = lang === 'zh';
-  const dn = (d: Dir) => (zh ? DIR_NAME[d].zh : DIR_NAME[d].en);
-  const el = (e: Element) => (zh ? ELEMENT_NAME[e].zh : ELEMENT_NAME[e].en);
+  const dn = (d: Dir) => DIR_NAME[d][lang];
+  const el = (e: Element) => ELEMENT_NAME[e][lang];
   const kua = profile.sex ? kuaOf(birthFsYear(profile.birth), profile.sex) : null;
   const thisYear = liChunYear(new Date());
   const [yr, setYr] = useState(thisYear);
@@ -1079,13 +1251,13 @@ function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Ch
             <div className="small"><b>{f.goodDirs}</b></div>
             <ul className="reasons">
               {kua.dirs.filter((d) => STAR8[d.star].good).map((d) => (
-                <li key={d.star}><span className="plus">{dn(d.dir)}</span> {zh ? STAR8[d.star].zh : STAR8[d.star].en}: {zh ? STAR8[d.star].useZh : STAR8[d.star].useEn}</li>
+                <li key={d.star}><span className="plus">{dn(d.dir)}</span> {STAR8[d.star][lang]}: {L3(lang, STAR8[d.star].useEn, STAR8[d.star].useZh, STAR8[d.star].useEs)}</li>
               ))}
             </ul>
             <div className="small"><b>{f.badDirs}</b></div>
             <ul className="reasons">
               {kua.dirs.filter((d) => !STAR8[d.star].good).map((d) => (
-                <li key={d.star}><span className="minus">{dn(d.dir)}</span> {zh ? STAR8[d.star].zh : STAR8[d.star].en}: {zh ? STAR8[d.star].useZh : STAR8[d.star].useEn}</li>
+                <li key={d.star}><span className="minus">{dn(d.dir)}</span> {STAR8[d.star][lang]}: {L3(lang, STAR8[d.star].useEn, STAR8[d.star].useZh, STAR8[d.star].useEs)}</li>
               ))}
             </ul>
             <p className="small muted">{f.dirsHow}</p>
@@ -1109,18 +1281,18 @@ function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Ch
             const st = FLY[stars[g]];
             return (
               <button key={g} role="gridcell" className={`fscell ${st.tone} ${cell === g ? 'sel' : ''}`} onClick={() => setCell(cell === g ? null : g)} aria-pressed={cell === g}
-                aria-label={`${g === 'C' ? f.center : dn(g)}: ${zh ? st.zh : st.en}, ${zh ? st.zh2 : st.en2}`}>
+                aria-label={`${g === 'C' ? f.center : dn(g)}: ${st[lang]}, ${L3(lang, st.en2, st.zh2, st.es2)}`}>
                 <span className="tiny">{g === 'C' ? f.center : dn(g)}</span>
                 <b>{stars[g]}</b>
-                <span className="tiny">{zh ? st.zh.split(' ')[1] : st.en2.split(/[ ,:]/)[0]}</span>
+                <span className="tiny">{zh ? st.zh.split(' ')[1] : L3(lang, st.en2, st.zh2, st.es2).split(/[ ,:]/)[0]}</span>
               </button>
             );
           })}
         </div>
         {!c ? <p className="small muted">{f.tapCell}</p> : (
           <div className="suggest">
-            <p className="small"><b>{cell === 'C' ? f.center : dn(cell as Dir)} · {zh ? c.zh : c.en}</b>: {zh ? c.zh2 : c.en2}</p>
-            <p className="small">{zh ? c.fixZh : c.fixEn}</p>
+            <p className="small"><b>{cell === 'C' ? f.center : dn(cell as Dir)} · {c[lang]}</b>: {L3(lang, c.en2, c.zh2, c.es2)}</p>
+            <p className="small">{L3(lang, c.fixEn, c.fixZh, c.fixEs)}</p>
             {SHOPPING_ON && c.query && <a className="link shopping-link" href={amazon(c.query)} target="_blank" rel="sponsored nofollow noopener noreferrer">{f.shop}</a>}
             {c.query && <p className="tiny muted">{f.shopNote}</p>}
           </div>
@@ -1142,7 +1314,7 @@ function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Ch
         {home && (
           <div className="suggest">
             <div className="row gap"><VerdictTag v={home.verdict} lang={lang} /><b>{f.houseSits} {dn(home.sitting)} {f.houseFaces} {dn(home.facing)} · {home.score}</b></div>
-            <ul className="reasons">{home.notes.map((n, i) => <li key={i}>{zh ? n.zh : n.en}</li>)}</ul>
+            <ul className="reasons">{home.notes.map((n, i) => <li key={i}>{n[lang]}</li>)}</ul>
             {SHOPPING_ON && FLY[home.doorStarThisYear].query && FLY[home.doorStarThisYear].tone === 'bad' && (
               <a className="link shopping-link" href={amazon(FLY[home.doorStarThisYear].query!)} target="_blank" rel="sponsored nofollow noopener noreferrer">{f.shop}</a>
             )}
@@ -1170,19 +1342,20 @@ function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Ch
 // ---------------- chart ----------------
 
 const ZODIAC_EMOJI: Record<string, string> = { 子: '🐭', 丑: '🐮', 寅: '🐯', 卯: '🐰', 辰: '🐲', 巳: '🐍', 午: '🐴', 未: '🐑', 申: '🐵', 酉: '🐔', 戌: '🐶', 亥: '🐷' };
-const DM_LINE: Record<string, { en: string; zh: string }> = {
-  甲: { en: 'Like a tall tree: upright, steady, always growing toward a goal.', zh: '像参天大树：正直、稳当，总是一路往上长。' },
-  乙: { en: 'Like vines and flowers: flexible, easy to be around, always finds a way.', zh: '像花草藤蔓：灵活、好相处，总能找到出路。' },
-  丙: { en: 'Like the sun: warm, open and generous; you light up a room.', zh: '像太阳：热情大方，走到哪儿亮到哪儿。' },
-  丁: { en: 'Like candlelight: thoughtful, warm, focused on what matters.', zh: '像烛光：细腻、温暖，专注在要紧的事上。' },
-  戊: { en: 'Like a mountain: reliable and calm; people feel safe around you.', zh: '像大山：可靠、沉稳，让人有安全感。' },
-  己: { en: 'Like garden soil: nurturing, practical and patient.', zh: '像田园沃土：会照顾人，务实、有耐心。' },
-  庚: { en: 'Like a blade: decisive and principled.', zh: '像一把刀：果断、讲原则。' },
-  辛: { en: 'Like fine jewelry: refined, precise, with an eye for quality.', zh: '像珠宝：精致、讲究，眼光高。' },
-  壬: { en: 'Like a great river: big-picture, adaptable, always moving.', zh: '像江河：眼界大、会变通，停不下来。' },
-  癸: { en: 'Like rain and dew: intuitive, gentle and quietly persistent.', zh: '像雨露：直觉强、温柔，默默坚持。' },
+const DM_LINE: Record<string, { en: string; zh: string; es: string }> = {
+  甲: { en: 'Like a tall tree: upright, steady, always growing toward a goal.', zh: '像参天大树：正直、稳当，总是一路往上长。', es: 'Como un árbol alto: recto, firme, siempre creciendo hacia una meta.' },
+  乙: { en: 'Like vines and flowers: flexible, easy to be around, always finds a way.', zh: '像花草藤蔓：灵活、好相处，总能找到出路。', es: 'Como enredaderas y flores: flexible, agradable, siempre encuentras un camino.' },
+  丙: { en: 'Like the sun: warm, open and generous; you light up a room.', zh: '像太阳：热情大方，走到哪儿亮到哪儿。', es: 'Como el sol: cálido, abierto y generoso; iluminas el lugar.' },
+  丁: { en: 'Like candlelight: thoughtful, warm, focused on what matters.', zh: '像烛光：细腻、温暖，专注在要紧的事上。', es: 'Como la luz de una vela: atento, cálido, centrado en lo que importa.' },
+  戊: { en: 'Like a mountain: reliable and calm; people feel safe around you.', zh: '像大山：可靠、沉稳，让人有安全感。', es: 'Como una montaña: confiable y sereno; la gente se siente segura contigo.' },
+  己: { en: 'Like garden soil: nurturing, practical and patient.', zh: '像田园沃土：会照顾人，务实、有耐心。', es: 'Como tierra de jardín: cuidas a los demás, práctico y paciente.' },
+  庚: { en: 'Like a blade: decisive and principled.', zh: '像一把刀：果断、讲原则。', es: 'Como una espada: decidido y con principios.' },
+  辛: { en: 'Like fine jewelry: refined, precise, with an eye for quality.', zh: '像珠宝：精致、讲究，眼光高。', es: 'Como una joya fina: refinado, preciso, con buen ojo para la calidad.' },
+  壬: { en: 'Like a great river: big-picture, adaptable, always moving.', zh: '像江河：眼界大、会变通，停不下来。', es: 'Como un gran río: visión amplia, adaptable, siempre en movimiento.' },
+  癸: { en: 'Like rain and dew: intuitive, gentle and quietly persistent.', zh: '像雨露：直觉强、温柔，默默坚持。', es: 'Como la lluvia y el rocío: intuitivo, amable y silenciosamente constante.' },
 };
 const ELS: Element[] = ['wood', 'fire', 'earth', 'metal', 'water'];
+const SUN_ES: Record<string, string> = { Aries: 'Aries', Taurus: 'Tauro', Gemini: 'Géminis', Cancer: 'Cáncer', Leo: 'Leo', Virgo: 'Virgo', Libra: 'Libra', Scorpio: 'Escorpio', Sagittarius: 'Sagitario', Capricorn: 'Capricornio', Aquarius: 'Acuario', Pisces: 'Piscis' };
 const EL_HAN: Record<Element, string> = { wood: '木', fire: '火', earth: '土', metal: '金', water: '水' };
 
 function ChartView({ lang, chart, profile, onEdit }: { lang: Lang; chart: Chart; profile: Profile; onEdit: (p: Profile) => void }) {
@@ -1191,7 +1364,7 @@ function ChartView({ lang, chart, profile, onEdit }: { lang: Lang; chart: Chart;
   const [editing, setEditing] = useState(false);
   if (editing) return <Onboarding lang={lang} setLang={() => {}} initial={profile} onDone={(p) => { onEdit(p); setEditing(false); }} onCancel={() => setEditing(false)} />;
   const zh = lang === 'zh';
-  const el = (e: Element) => (zh ? ELEMENT_NAME[e].zh : ELEMENT_NAME[e].en);
+  const el = (e: Element) => ELEMENT_NAME[e][lang];
   const total = ELS.reduce((a, e) => a + chart.counts[e], 0) || 1;
   // the visible layer: each stem, plus each branch's main element; the rest of the count comes from hidden stems
   const visible: Record<Element, number> = { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 };
@@ -1207,19 +1380,20 @@ function ChartView({ lang, chart, profile, onEdit }: { lang: Lang; chart: Chart;
   const bornStr = `${born.toLocaleDateString(tLocale(lang), { year: 'numeric', month: zh ? 'long' : 'short', day: 'numeric' })}${b.hourUnknown ? ` · ${t.timeUnknownShort}` : ` · ${born.toLocaleTimeString(tLocale(lang), { hour: 'numeric', minute: '2-digit' })}`}`;
   const dmEl = chart.dayMasterElement;
   const yinYang = ['甲', '丙', '戊', '庚', '壬'].includes(chart.dayMaster) ? (zh ? '阳' : 'Yang') : (zh ? '阴' : 'Yin');
+  const es = lang === 'es';
   return (
     <div className="stack">
       <h1>{t.myChart}</h1>
       <section className="card profcard">
         <div className="zav" aria-hidden="true">{ZODIAC_EMOJI[chart.yearBranch]}</div>
         <div className="grow">
-          <b>{profile.name || (zh ? '我' : 'Me')}</b>
+          <b>{profile.name || L3(lang, 'Me', '我', 'Yo')}</b>
           <div className="small muted">{bornStr}{profile.place ? ` · ${profile.place}` : ''}</div>
-          <div className="tiny">{zh ? `属${BRANCH[chart.yearBranch].zh} · ${chart.sunSign.zh}` : `${BRANCH[chart.yearBranch].animal} · ${chart.sunSign.en}`} · {t.clockTimeNote}</div>
+          <div className="tiny">{zh ? `属${BRANCH[chart.yearBranch].zh} · ${chart.sunSign.zh}` : es ? `${ANIMAL_ES[BRANCH[chart.yearBranch].animal]} · ${SUN_ES[chart.sunSign.en] ?? chart.sunSign.en}` : `${BRANCH[chart.yearBranch].animal} · ${chart.sunSign.en}`} · {t.clockTimeNote}</div>
         </div>
       </section>
 
-      <div className="sechead"><h3>{zh ? '你的四柱' : 'Your four pillars'}</h3><span className="tiny">{zh ? '上：天干 · 下：地支' : 'top: stem · bottom: branch'}</span></div>
+      <div className="sechead"><h3>{L3(lang, 'Your four pillars', '你的四柱', 'Tus cuatro pilares')}</h3><span className="tiny">{L3(lang, 'top: stem · bottom: branch', '上：天干 · 下：地支', 'arriba: tronco · abajo: rama')}</span></div>
       <div className="pillars">
         {chart.pillars.map((p) => {
           const hidden = p.label === 'hour' && chart.hourUnknown;
@@ -1227,7 +1401,7 @@ function ChartView({ lang, chart, profile, onEdit }: { lang: Lang; chart: Chart;
             <div key={p.label} className={`pillar ${p.label === 'day' ? 'dm' : ''}`}>
               <div className="k">{t[p.label]}{p.label === 'day' ? ` · ${v.you}` : ''}</div>
               <div className="gz">{hidden ? '?' : p.stem}<br />{hidden ? '?' : p.branch}</div>
-              {!hidden && <div className="elan">{zh ? `${ELEMENT_NAME[STEM[p.stem].el].zh}${BRANCH[p.branch].zh}` : `${ELEMENT_NAME[STEM[p.stem].el].en} ${BRANCH[p.branch].animal}`}</div>}
+              {!hidden && <div className="elan">{zh ? `${ELEMENT_NAME[STEM[p.stem].el].zh}${BRANCH[p.branch].zh}` : es ? `${ANIMAL_ES[BRANCH[p.branch].animal]} de ${ELEMENT_NAME[STEM[p.stem].el].es}` : `${ELEMENT_NAME[STEM[p.stem].el].en} ${BRANCH[p.branch].animal}`}</div>}
               <div className="area">{v.areas[p.label]}</div>
               {!hidden && <div className="tiny" title={t.hiddenStems}>{t.hiddenShort} {HIDDEN[p.branch].join('')}</div>}
             </div>
@@ -1240,8 +1414,8 @@ function ChartView({ lang, chart, profile, onEdit }: { lang: Lang; chart: Chart;
           <div className="dmchar" aria-hidden="true">{chart.dayMaster}</div>
           <div className="grow">
             <div className="tiny">{v.dmLabel}</div>
-            <h3>{zh ? `${yinYang}${ELEMENT_NAME[dmEl].zh} · ${chart.strong ? t.strong : t.weak}` : `${yinYang} ${ELEMENT_NAME[dmEl].en} · ${chart.strong ? t.strong : t.weak}`}</h3>
-            <p className="small">{zh ? DM_LINE[chart.dayMaster].zh : DM_LINE[chart.dayMaster].en}</p>
+            <h3>{zh ? `${yinYang}${ELEMENT_NAME[dmEl].zh} · ${chart.strong ? t.strong : t.weak}` : es ? `${ELEMENT_NAME[dmEl].es} ${yinYang} · ${chart.strong ? t.strong : t.weak}` : `${yinYang} ${ELEMENT_NAME[dmEl].en} · ${chart.strong ? t.strong : t.weak}`}</h3>
+            <p className="small">{DM_LINE[chart.dayMaster][lang]}</p>
           </div>
         </div>
         <div className="hg">
@@ -1258,7 +1432,7 @@ function ChartView({ lang, chart, profile, onEdit }: { lang: Lang; chart: Chart;
           const vis = Math.min(chart.counts[e], visible[e]);
           return (
             <div key={e} className="bar-row">
-              <span className="bar-label"><span className="han" style={{ color: `var(--${e})` }}>{EL_HAN[e]}</span>{zh ? '' : ELEMENT_NAME[e].en}</span>
+              <span className="bar-label"><span className="han" style={{ color: `var(--${e})` }}>{EL_HAN[e]}</span>{zh ? '' : ELEMENT_NAME[e][lang]}</span>
               <span className="bar" role="img" aria-label={`${el(e)} ${pct}%`}>
                 <span className={`fill hid ${e}`} style={{ width: `${(chart.counts[e] / total) * 100}%` }} />
                 <span className={`fill base ${e}`} style={{ width: `${(vis / total) * 100}%` }} />
@@ -1304,8 +1478,10 @@ function Settings({ lang, setLang, ics, setIcs, billNote, gcal, gcalNote, onGcal
         <div className="seg">
           <button className={lang === 'en' ? 'on' : ''} onClick={() => setLang('en')}>English</button>
           <button className={lang === 'zh' ? 'on' : ''} onClick={() => setLang('zh')}>中文</button>
+          <button className={lang === 'es' ? 'on' : ''} onClick={() => setLang('es')}>Español</button>
         </div>
       </section>
+      {ACCOUNTS_ON && <WhatsAppCard lang={lang} />}
       <section className="card form">
         <div className="label">{t.calendar}</div>
         {!calOk ? <Locked lang={lang} text={t.bill.lockedCal} /> : <GcalCard lang={lang} gcal={gcal} note={gcalNote} onConnect={onGcalConnect} onRefresh={onGcalRefresh} onDisconnect={onGcalDisconnect} />}
@@ -1408,6 +1584,46 @@ function PlanCard({ lang, note }: { lang: Lang; note: string }) {
           <input className="grow" value={code} onChange={(e) => setCode(e.target.value)} placeholder={b.haveCode} aria-label={b.haveCode} autoCapitalize="characters" />
           <button className="ghost" disabled={busy || !code.trim()}>{b.redeem}</button>
         </form>
+      )}
+    </section>
+  );
+}
+
+function WhatsAppCard({ lang }: { lang: Lang }) {
+  const w = T[lang].wa;
+  const [st, setSt] = useState<{ enabled: boolean; number?: string; linked?: string | null } | null>(null);
+  const [code, setCode] = useState<string | null>(null);
+  const load = () => fetch('/api/whatsapp/link').then((r) => r.json()).then(setSt).catch(() => {});
+  useEffect(() => { load(); }, []);
+  // while a code is showing, check every few seconds whether the person has sent it
+  useEffect(() => { if (!code) return; const id = setInterval(load, 4000); return () => clearInterval(id); }, [code]);
+  useEffect(() => { if (st?.linked) setCode(null); }, [st?.linked]);
+  if (!st?.enabled) return null;
+  const msgLink = (c: string) => `https://wa.me/${st.number}?text=${encodeURIComponent(c)}`;
+  return (
+    <section className="card stack">
+      <div className="label">WhatsApp</div>
+      {st.linked ? (
+        <>
+          <p className="small"><b>✓ {w.linked}</b> · {st.linked}</p>
+          <p className="small muted">{w.how}</p>
+          <div className="row gap">
+            <a className="ghost btnlink" href={`https://wa.me/${st.number}`} target="_blank" rel="noopener noreferrer">{w.open}</a>
+            <button className="link danger" onClick={async () => { if (confirm(w.unlinkQ)) { await fetch('/api/whatsapp/link', { method: 'DELETE' }); load(); } }}>{w.unlink}</button>
+          </div>
+        </>
+      ) : code ? (
+        <>
+          <p className="small">{w.sendCode}</p>
+          <div className="wacode">{code}</div>
+          <a className="primary btnlink" href={msgLink(code)} target="_blank" rel="noopener noreferrer">{w.sendBtn}</a>
+          <p className="tiny">{w.waiting}</p>
+        </>
+      ) : (
+        <>
+          <p className="small muted">{w.pitch}</p>
+          <button className="primary" onClick={async () => { const j = await fetch('/api/whatsapp/link', { method: 'POST' }).then((r) => r.json()).catch(() => null); if (j?.code) setCode(j.code); }}>{w.connect}</button>
+        </>
       )}
     </section>
   );
@@ -1534,7 +1750,7 @@ function MailSection({ lang, chart, mail, mailAddr, usage, onEnable, onCheck, on
                   <div className="grow">
                     <div className="ev-title">{m.title}</div>
                     <div className="muted small">{m.from}{m.amount ? ` · ${m.amount}` : ''}{ev ? ` · ${fmtDay(new Date(ev.start), lang)}${ev.allDay ? '' : ' ' + fmtTime(ev.start, lang)}` : ''}</div>
-                    {r && <div className="small">{cat !== 'general' ? `${activityName(cat, lang)}: ` : ''}{r.reasons.filter((x) => x.scope !== 'hour' || !ev?.allDay).slice(0, 1).map((x) => (lang === 'zh' ? x.zh : x.en))}</div>}
+                    {r && <div className="small">{cat !== 'general' ? `${activityName(cat, lang)}: ` : ''}{r.reasons.filter((x) => x.scope !== 'hour' || !ev?.allDay).slice(0, 1).map((x) => reasonText(x, lang))}</div>}
                     {!r && m.summary && <div className="small muted">{m.summary}</div>}
                   </div>
                   {r && <VerdictTag v={r.verdict} lang={lang} />}
@@ -1562,6 +1778,6 @@ function Icon({ name }: { name: Tab }) {
 // The device's preferred language: the first of the person's languages that FateCal speaks.
 function deviceLang(): Lang {
   const list = (navigator.languages?.length ? navigator.languages : [navigator.language]).filter(Boolean);
-  for (const x of list) { const p = x.toLowerCase().slice(0, 2); if (p === 'zh') return 'zh'; if (p === 'en') return 'en'; }
+  for (const x of list) { const p = x.toLowerCase().slice(0, 2); if (p === 'zh') return 'zh'; if (p === 'es') return 'es'; if (p === 'en') return 'en'; }
   return 'en';
 }

@@ -12,6 +12,7 @@ export const PREMIUM_OPEN = false;
 
 export interface Limits {
   askPerDay: number;       // FateBot questions per day
+  parsePerDay: number;     // events added by one sentence (app, voice or WhatsApp) per day
   photos: boolean;         // photo questions
   manualPerDay: number;    // events you can add per day
   syncCalendar: boolean;   // Google Calendar + iCal
@@ -21,9 +22,9 @@ export interface Limits {
   homeChecksPerMonth: number;
 }
 export const LIMITS: Record<Plan, Limits> = {
-  free: { askPerDay: 3, photos: false, manualPerDay: 3, syncCalendar: false, mailForwarding: false, fullReasons: false, nextYearStars: false, homeChecksPerMonth: 1 },
-  basic: { askPerDay: 30, photos: true, manualPerDay: 1000, syncCalendar: true, mailForwarding: true, fullReasons: true, nextYearStars: true, homeChecksPerMonth: 3 },
-  premium: { askPerDay: 200, photos: true, manualPerDay: 1000, syncCalendar: true, mailForwarding: true, fullReasons: true, nextYearStars: true, homeChecksPerMonth: 1000 },
+  free: { askPerDay: 3, parsePerDay: 5, photos: false, manualPerDay: 1000, syncCalendar: false, mailForwarding: false, fullReasons: false, nextYearStars: false, homeChecksPerMonth: 1 },
+  basic: { askPerDay: 30, parsePerDay: 100, photos: true, manualPerDay: 1000, syncCalendar: true, mailForwarding: true, fullReasons: true, nextYearStars: true, homeChecksPerMonth: 3 },
+  premium: { askPerDay: 200, parsePerDay: 300, photos: true, manualPerDay: 1000, syncCalendar: true, mailForwarding: true, fullReasons: true, nextYearStars: true, homeChecksPerMonth: 1000 },
 };
 export const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 

@@ -26,7 +26,7 @@ export type Category =
   | 'conception' | 'romance' | 'opening' | 'haircut' | 'study' | 'cleaning' | 'general';
 
 export type Scope = 'day' | 'hour' | 'almanac-day' | 'almanac-hour';
-export interface Reason { delta: number; en: string; zh: string; scope: Scope }
+export interface Reason { delta: number; en: string; zh: string; es: string; scope: Scope }
 
 export interface BirthInput { year: number; month: number; day: number; hour: number; minute: number; hourUnknown?: boolean }
 
@@ -77,9 +77,9 @@ export const HIDDEN: Record<string, string[]> = {
   午: ['丁', '己'], 未: ['己', '丁', '乙'], 申: ['庚', '壬', '戊'], 酉: ['辛'], 戌: ['戊', '辛', '丁'], 亥: ['壬', '甲'],
 };
 
-export const ELEMENT_NAME: Record<Element, { en: string; zh: string }> = {
-  wood: { en: 'Wood', zh: '木' }, fire: { en: 'Fire', zh: '火' }, earth: { en: 'Earth', zh: '土' },
-  metal: { en: 'Metal', zh: '金' }, water: { en: 'Water', zh: '水' },
+export const ELEMENT_NAME: Record<Element, { en: string; zh: string; es: string }> = {
+  wood: { en: 'Wood', zh: '木', es: 'Madera' }, fire: { en: 'Fire', zh: '火', es: 'Fuego' }, earth: { en: 'Earth', zh: '土', es: 'Tierra' },
+  metal: { en: 'Metal', zh: '金', es: 'Metal' }, water: { en: 'Water', zh: '水', es: 'Agua' },
 };
 
 const GENERATES: Record<Element, Element> = { wood: 'fire', fire: 'earth', earth: 'metal', metal: 'water', water: 'wood' };
@@ -104,7 +104,8 @@ export function branchRelation(a: string, b: string): BranchRel {
   return 'none';
 }
 
-const branchLabel = (b: string) => ({ en: `${BRANCH[b].animal} (${BRANCH[b].pinyin})`, zh: b });
+export const ANIMAL_ES: Record<string, string> = { Rat: 'Rata', Ox: 'Buey', Tiger: 'Tigre', Rabbit: 'Conejo', Dragon: 'Dragón', Snake: 'Serpiente', Horse: 'Caballo', Goat: 'Cabra', Monkey: 'Mono', Rooster: 'Gallo', Dog: 'Perro', Pig: 'Cerdo' };
+const branchLabel = (b: string) => ({ en: `${BRANCH[b].animal} (${BRANCH[b].pinyin})`, zh: b, es: `${ANIMAL_ES[BRANCH[b].animal]} (${BRANCH[b].pinyin})` });
 
 // ---------- sun sign ----------
 
@@ -218,40 +219,43 @@ export function scoreMoment(chart: Chart, when: Date, category: Category = 'gene
   const hourBranch: string = lunar.getTimeZhi();
   const reasons: Reason[] = [];
   let scope: Scope = 'day';
-  const add = (delta: number, en: string, zh: string) => reasons.push({ delta, en, zh, scope });
+  const add = (delta: number, en: string, zh: string, es: string) => reasons.push({ delta, en, zh, es, scope });
   const dm = `${STEM[chart.dayMaster].pinyin} ${ELEMENT_NAME[chart.dayMasterElement].en}`;
   const dmZh = `${chart.dayMaster}${ELEMENT_NAME[chart.dayMasterElement].zh}`;
+  const dmEs = `${STEM[chart.dayMaster].pinyin} ${ELEMENT_NAME[chart.dayMasterElement].es}`;
 
   // 1. day stem element vs favorable elements
   const dEl = STEM[dayStem].el;
   if (chart.favorable.includes(dEl))
     add(8, `It is a ${STEM[dayStem].pinyin} ${ELEMENT_NAME[dEl].en} day, an element that helps your ${dm} Day Master.`,
-      `这天是${ELEMENT_NAME[dEl].zh}日（${dayStem}），${ELEMENT_NAME[dEl].zh}正好对你有帮助，做事更顺。`);
+      `这天是${ELEMENT_NAME[dEl].zh}日（${dayStem}），${ELEMENT_NAME[dEl].zh}正好对你有帮助，做事更顺。`,
+      `Es un día ${STEM[dayStem].pinyin} de ${ELEMENT_NAME[dEl].es}, un elemento que ayuda a tu Maestro del Día ${dmEs}.`);
   else
     add(-6, `It is a ${STEM[dayStem].pinyin} ${ELEMENT_NAME[dEl].en} day, an element that works against your ${dm} Day Master.`,
-      `这天是${ELEMENT_NAME[dEl].zh}日（${dayStem}），${ELEMENT_NAME[dEl].zh}对你不太有利，做事容易费劲。`);
+      `这天是${ELEMENT_NAME[dEl].zh}日（${dayStem}），${ELEMENT_NAME[dEl].zh}对你不太有利，做事容易费劲。`,
+      `Es un día ${STEM[dayStem].pinyin} de ${ELEMENT_NAME[dEl].es}, un elemento que va en contra de tu Maestro del Día ${dmEs}.`);
 
   // 2. day branch vs natal day branch and year branch
   const nb = branchLabel(chart.dayBranch), db = branchLabel(dayBranch);
   const dRel = branchRelation(dayBranch, chart.dayBranch);
-  if (dRel === 'clash') add(-15, `The ${db.en} day clashes with your ${nb.en} day branch: friction and reversals.`, `这天的「${dayBranch}」跟你命里的「${chart.dayBranch}」正好相冲，计划容易被打乱、出变故。`);
-  if (dRel === 'harm') add(-7, `The ${db.en} day harms your ${nb.en} day branch: hidden obstacles.`, `这天的「${dayBranch}」跟你命里的「${chart.dayBranch}」互相妨碍，容易遇到看不见的阻力。`);
-  if (dRel === 'harmony') add(9, `The ${db.en} day combines with your ${nb.en} day branch: things come together.`, `这天的「${dayBranch}」跟你命里的「${chart.dayBranch}」特别合得来，跟人打交道顺，事情好谈。`);
-  if (dRel === 'trine') add(5, `The ${db.en} day forms a trine with your ${nb.en} day branch.`, `这天的「${dayBranch}」跟你命里的「${chart.dayBranch}」是一伙的，容易得到帮助。`);
+  if (dRel === 'clash') add(-15, `The ${db.en} day clashes with your ${nb.en} day branch: friction and reversals.`, `这天的「${dayBranch}」跟你命里的「${chart.dayBranch}」正好相冲，计划容易被打乱、出变故。`, `El día ${db.es} choca con tu rama del día ${nb.es}: roces y cambios de planes.`);
+  if (dRel === 'harm') add(-7, `The ${db.en} day harms your ${nb.en} day branch: hidden obstacles.`, `这天的「${dayBranch}」跟你命里的「${chart.dayBranch}」互相妨碍，容易遇到看不见的阻力。`, `El día ${db.es} perjudica tu rama del día ${nb.es}: obstáculos ocultos.`);
+  if (dRel === 'harmony') add(9, `The ${db.en} day combines with your ${nb.en} day branch: things come together.`, `这天的「${dayBranch}」跟你命里的「${chart.dayBranch}」特别合得来，跟人打交道顺，事情好谈。`, `El día ${db.es} se combina con tu rama del día ${nb.es}: las cosas encajan.`);
+  if (dRel === 'trine') add(5, `The ${db.en} day forms a trine with your ${nb.en} day branch.`, `这天的「${dayBranch}」跟你命里的「${chart.dayBranch}」是一伙的，容易得到帮助。`, `El día ${db.es} forma un trígono con tu rama del día ${nb.es}: llega ayuda.`);
   if (branchRelation(dayBranch, chart.yearBranch) === 'clash')
-    add(-6, `The day clashes with your zodiac sign (${BRANCH[chart.yearBranch].animal}).`, `这天跟你的属相（属${BRANCH[chart.yearBranch].zh}）相冲，凡事多留个心眼。`);
+    add(-6, `The day clashes with your zodiac sign (${BRANCH[chart.yearBranch].animal}).`, `这天跟你的属相（属${BRANCH[chart.yearBranch].zh}）相冲，凡事多留个心眼。`, `El día choca con tu signo del zodiaco (${ANIMAL_ES[BRANCH[chart.yearBranch].animal]}).`);
 
   // 3. hour branch vs natal day branch
   scope = 'hour';
   {
     const hb = branchLabel(hourBranch);
     const hRel = branchRelation(hourBranch, chart.dayBranch);
-    if (hRel === 'clash') add(-12, `${hb.en} hour clashes with your ${nb.en} day branch.`, `${hourBranch}时（${HOUR_ZH[hourBranch]}）跟你命里的「${chart.dayBranch}」相冲，这个时段容易出岔子。`);
-    if (hRel === 'harm') add(-9, `${hb.en} hour harms your ${nb.en} day branch, so talks tend to stall.`, `${hourBranch}时（${HOUR_ZH[hourBranch]}）跟你命里的「${chart.dayBranch}」互相妨碍，这个时段谈事容易卡住、有分歧。`);
-    if (hRel === 'harmony') add(8, `${hb.en} hour combines with your ${nb.en} day branch.`, `${hourBranch}时（${HOUR_ZH[hourBranch]}）跟你命里的「${chart.dayBranch}」很合，这个时段办事顺。`);
-    if (hRel === 'trine') add(5, `${hb.en} hour forms a trine with your ${nb.en} day branch.`, `${hourBranch}时（${HOUR_ZH[hourBranch]}）跟你命里的「${chart.dayBranch}」是一伙的，这个时段有人帮。`);
+    if (hRel === 'clash') add(-12, `${hb.en} hour clashes with your ${nb.en} day branch.`, `${hourBranch}时（${HOUR_ZH[hourBranch]}）跟你命里的「${chart.dayBranch}」相冲，这个时段容易出岔子。`, `La hora del ${hb.es} choca con tu rama del día ${nb.es}.`);
+    if (hRel === 'harm') add(-9, `${hb.en} hour harms your ${nb.en} day branch, so talks tend to stall.`, `${hourBranch}时（${HOUR_ZH[hourBranch]}）跟你命里的「${chart.dayBranch}」互相妨碍，这个时段谈事容易卡住、有分歧。`, `La hora del ${hb.es} perjudica tu rama del día ${nb.es}; las conversaciones tienden a estancarse.`);
+    if (hRel === 'harmony') add(8, `${hb.en} hour combines with your ${nb.en} day branch.`, `${hourBranch}时（${HOUR_ZH[hourBranch]}）跟你命里的「${chart.dayBranch}」很合，这个时段办事顺。`, `La hora del ${hb.es} se combina con tu rama del día ${nb.es}.`);
+    if (hRel === 'trine') add(5, `${hb.en} hour forms a trine with your ${nb.en} day branch.`, `${hourBranch}时（${HOUR_ZH[hourBranch]}）跟你命里的「${chart.dayBranch}」是一伙的，这个时段有人帮。`, `La hora del ${hb.es} forma un trígono con tu rama del día ${nb.es}.`);
     const hEl = STEM[hourStem].el;
-    if (chart.favorable.includes(hEl)) add(3, `The hour stem (${ELEMENT_NAME[hEl].en}) is favorable for you.`, `这个时段属${ELEMENT_NAME[hEl].zh}，对你有利。`);
+    if (chart.favorable.includes(hEl)) add(3, `The hour stem (${ELEMENT_NAME[hEl].en}) is favorable for you.`, `这个时段属${ELEMENT_NAME[hEl].zh}，对你有利。`, `El tronco de la hora (${ELEMENT_NAME[hEl].es}) te favorece.`);
   }
 
   // 4. almanac yi / ji for the activity
@@ -262,18 +266,18 @@ export function scoreMoment(chart: Chart, when: Date, category: Category = 'gene
     const hit = (list: string[]) => words.find((w) => list.includes(w));
     let w: string | undefined;
     scope = 'almanac-day';
-    if ((w = hit(dayYi))) add(7, `The almanac favors this that day (${gl(w)}).`, `老黄历说这天适合「${w}」${gz(w)}。`);
-    if ((w = hit(dayJi))) add(-10, `The almanac advises against this that day (${gl(w)}).`, `老黄历说这天不适合「${w}」${gz(w)}。`);
+    if ((w = hit(dayYi))) add(7, `The almanac favors this that day (${gl(w)}).`, `老黄历说这天适合「${w}」${gz(w)}。`, `El almanaque favorece esto ese día (${gl(w)}).`);
+    if ((w = hit(dayJi))) add(-10, `The almanac advises against this that day (${gl(w)}).`, `老黄历说这天不适合「${w}」${gz(w)}。`, `El almanaque desaconseja esto ese día (${gl(w)}).`);
     scope = 'almanac-hour';
-    if ((w = hit(hourYi))) add(3, `This hour suits it (${gl(w)}).`, `这个时段也适合「${w}」。`);
-    if ((w = hit(hourJi))) add(-5, `This hour is unsuited to it (${gl(w)}).`, `这个时段不适合「${w}」。`);
+    if ((w = hit(hourYi))) add(3, `This hour suits it (${gl(w)}).`, `这个时段也适合「${w}」。`, `Esta hora es adecuada (${gl(w)}).`);
+    if ((w = hit(hourJi))) add(-5, `This hour is unsuited to it (${gl(w)}).`, `这个时段不适合「${w}」。`, `Esta hora no es adecuada (${gl(w)}).`);
   }
 
   // 5. day officer (建除十二值星)
   scope = 'day';
   const officer: string = lunar.getZhiXing();
-  if (officer === '破') add(-6, 'A "Break" day in the almanac: avoid starting important things.', '这天是老黄历上的「破日」，不适合开始重要的事。');
-  if (officer === '成' || officer === '开') add(4, `An "${officer === '成' ? 'Success' : 'Open'}" day in the almanac.`, `这天是老黄历上的「${officer}日」，做事容易有结果。`);
+  if (officer === '破') add(-6, 'A "Break" day in the almanac: avoid starting important things.', '这天是老黄历上的「破日」，不适合开始重要的事。', 'Un día de «Ruptura» en el almanaque: evita empezar cosas importantes.');
+  if (officer === '成' || officer === '开') add(4, `An "${officer === '成' ? 'Success' : 'Open'}" day in the almanac.`, `这天是老黄历上的「${officer}日」，做事容易有结果。`, `Un día de «${officer === '成' ? 'Éxito' : 'Apertura'}» en el almanaque.`);
 
   const score = Math.max(5, Math.min(98, 60 + reasons.reduce((a, r) => a + r.delta, 0)));
   return { score, verdict: verdictOf(score), reasons, dayGanZhi: `${dayStem}${dayBranch}`, hourGanZhi: `${hourStem}${hourBranch}` };
@@ -299,22 +303,23 @@ export function scoreDay(chart: Chart, date: Date): DaySummary {
 }
 
 // Modern activities shown as "good for / avoid" in place of the raw almanac list.
-export const ACTIVITIES: { cat: Category; en: string; zh: string }[] = [
-  { cat: 'meeting', en: 'meetings & negotiations', zh: '会面谈判' },
-  { cat: 'signing', en: 'signing contracts', zh: '签约' },
-  { cat: 'travel', en: 'travel', zh: '出行' },
-  { cat: 'opening', en: 'launches & openings', zh: '发布开业' },
-  { cat: 'money', en: 'big purchases', zh: '大额消费' },
-  { cat: 'moving', en: 'moving house', zh: '搬家' },
-  { cat: 'romance', en: 'dates & proposals', zh: '约会求婚' },
-  { cat: 'medical', en: 'medical visits', zh: '就医' },
-  { cat: 'haircut', en: 'haircuts', zh: '理发' },
+export const ACTIVITIES: { cat: Category; en: string; zh: string; es: string }[] = [
+  { cat: 'meeting', en: 'meetings & negotiations', zh: '会面谈判', es: 'reuniones y negociaciones' },
+  { cat: 'signing', en: 'signing contracts', zh: '签约', es: 'firmar contratos' },
+  { cat: 'travel', en: 'travel', zh: '出行', es: 'viajes' },
+  { cat: 'opening', en: 'launches & openings', zh: '发布开业', es: 'lanzamientos e inauguraciones' },
+  { cat: 'money', en: 'big purchases', zh: '大额消费', es: 'compras grandes' },
+  { cat: 'moving', en: 'moving house', zh: '搬家', es: 'mudanzas' },
+  { cat: 'romance', en: 'dates & proposals', zh: '约会求婚', es: 'citas y propuestas' },
+  { cat: 'medical', en: 'medical visits', zh: '就医', es: 'visitas médicas' },
+  { cat: 'haircut', en: 'haircuts', zh: '理发', es: 'cortes de pelo' },
 ];
-export const activityName = (c: Category, lang: 'en' | 'zh') => {
+export const activityName = (c: Category, lang: 'en' | 'zh' | 'es') => {
   const a = ACTIVITIES.find((x) => x.cat === c);
-  if (a) return lang === 'zh' ? a.zh : a.en;
-  return ({ build: ['renovation', '装修动土'], wedding: ['weddings', '婚嫁'], conception: ['trying for a baby', '求子'], study: ['study & exams', '学习考试'], cleaning: ['cleaning', '打扫'], general: ['this', '此事'] } as Record<string, string[]>)[c]?.[lang === 'zh' ? 1 : 0] ?? c;
+  if (a) return a[lang];
+  return ({ build: ['renovation', '装修动土', 'obras'], wedding: ['weddings', '婚嫁', 'bodas'], conception: ['trying for a baby', '求子', 'buscar un bebé'], study: ['study & exams', '学习考试', 'estudios y exámenes'], cleaning: ['cleaning', '打扫', 'limpieza'], general: ['this', '此事', 'esto'] } as Record<string, string[]>)[c]?.[lang === 'zh' ? 1 : lang === 'es' ? 2 : 0] ?? c;
 };
+export const reasonText = (r: { en: string; zh: string; es?: string }, lang: 'en' | 'zh' | 'es') => (lang === 'zh' ? r.zh : lang === 'es' ? r.es ?? r.en : r.en);
 
 export function dayActivities(chart: Chart, date: Date) {
   const noon = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0);
@@ -333,7 +338,14 @@ export function dayActivities(chart: Chart, date: Date) {
   return { good, avoid };
 }
 
-export interface CalEvent { id: string; title: string; start: string; end: string; allDay?: boolean; source: 'manual' | 'calendar' | 'email'; from?: string; cat?: Category }
+export interface Repeat { freq: 'daily' | 'weekly' | 'monthly'; byDay?: number[]; until?: string }
+export interface CalEvent {
+  id: string; title: string; start: string; end: string; allDay?: boolean; source: 'manual' | 'calendar' | 'email'; from?: string; cat?: Category;
+  repeat?: Repeat;        // a repeating series (manual events only)
+  exdates?: string[];     // YYYY-MM-DD dates skipped in the series
+  seriesId?: string;      // set on one occurrence of a series
+  via?: 'ai' | 'whatsapp';
+}
 
 export interface EventReading extends MomentScore { category: Category; alternatives: { start: string; end: string; score: number; verdict: Verdict }[] }
 

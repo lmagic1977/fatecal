@@ -1,4 +1,4 @@
-type Lang = 'en' | 'zh';
+type Lang = 'en' | 'zh' | 'es';
 
 // Fixed, non-personal search terms. Never put chart or calendar data in merchant URLs.
 const resources = [

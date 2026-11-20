@@ -37,7 +37,7 @@ Rules:
 - Feng shui: for questions about a home, room, office, desk, bed, door or direction, use fengShui in <context>: personalDirections (the person's Eight Mansions good and bad directions), favorableElementDirections, and flyingStars for this year and next (what each sector holds and its traditional remedy). Name concrete directions and placements, e.g. bed head toward the southeast (your Tian Yi, health direction). If personalDirections is unknown, give the flying-star and element advice and ask them to set their sex in the Feng Shui tab for personal directions. For a room photo, also judge the layout: bed or desk in a commanding position facing the door without being in line with it, no beam over the bed, mirrors not facing the bed, clutter, light.
 - Remedies: when something is not good and the person cannot change it (a booked flight, a visa interview, a contract date, a house they already live in), do not stop at "it's bad". Give one to three small traditional remedies: a color to wear, a small item of a favorable element to carry or place (e.g. black or blue for water, white or gold metal, green wood), a direction to face or sit, a better hour on the same day, and good preparation. Present them as tradition that can help someone feel prepared, never as a guarantee; never use fear, and never push buying anything.
 - In English replies use no Chinese characters at all: translate almanac terms (e.g. 会亲友 → visiting friends and family, 立券 → signing contracts) and call pillars by pinyin (Geng-Shen day).
-- Reply in the language given in <lang> (en = English, zh = Simplified Chinese).`;
+- Reply in the language given in <lang> (en = English, zh = Simplified Chinese, es = Spanish).`;
 
 export async function POST(req: Request) {
   const denied = await needUser();
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
   const question = body.question.slice(0, 1000);
   const context = JSON.stringify(body.context ?? {}).slice(0, 60000);
   const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
-  const lang = body.lang === 'zh' ? 'zh' : 'en';
+  const lang = body.lang === 'zh' ? 'zh' : body.lang === 'es' ? 'es' : 'en';
   const img = body.image && typeof body.image.data === 'string' && /^image\/(jpeg|png|webp|gif)$/.test(body.image.media_type) && body.image.data.length < 4_000_000 ? body.image : null;
 
   // plan limits: photo questions and questions per day
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
       role: 'user',
       content: [
         ...(img ? [{ type: 'image' as const, source: { type: 'base64' as const, media_type: img.media_type, data: img.data } }] : []),
-        { type: 'text' as const, text: `<lang>${lang}</lang>\n<context>${context}</context>\n\n${question || (lang === 'zh' ? '帮我看看这张图的风水，合不合我？' : 'What does this photo mean for me? Is it a good fit for my chart?')}` },
+        { type: 'text' as const, text: `<lang>${lang}</lang>\n<context>${context}</context>\n\n${question || (lang === 'zh' ? '帮我看看这张图的风水，合不合我？' : lang === 'es' ? '¿Qué significa esta foto para mí? ¿Encaja con mi carta?' : 'What does this photo mean for me? Is it a good fit for my chart?')}` },
       ],
     },
   ];
