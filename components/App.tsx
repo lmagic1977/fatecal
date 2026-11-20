@@ -40,7 +40,7 @@ interface Seed { q: string; photo?: Pic }
 const birthFsYear = (b: BirthInput) => liChunYear(new Date(b.year, b.month - 1, b.day, b.hourUnknown ? 12 : b.hour, b.hourUnknown ? 0 : b.minute));
 interface Msg { role: 'user' | 'assistant'; text: string; image?: string; upsell?: boolean }
 
-const K = { owner: 'fatecal.owner', profile: 'fatecal.profile', events: 'fatecal.events', ics: 'fatecal.ics', lang: 'fatecal.lang', mailKey: 'fatecal.mailkey', mailAddr: 'fatecal.mailaddr', mail: 'fatecal.mail', mailEdits: 'fatecal.mailedits', gcalKey: 'fatecal.gcalkey', gcal: 'fatecal.gcal' };
+const K = { langPick: 'fatecal.langpick', owner: 'fatecal.owner', profile: 'fatecal.profile', events: 'fatecal.events', ics: 'fatecal.ics', lang: 'fatecal.lang', mailKey: 'fatecal.mailkey', mailAddr: 'fatecal.mailaddr', mail: 'fatecal.mail', mailEdits: 'fatecal.mailedits', gcalKey: 'fatecal.gcalkey', gcal: 'fatecal.gcal' };
 
 function load<T>(k: string, fallback: T): T {
   try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
@@ -66,9 +66,13 @@ const mailToEvent = (m: MailItem): CalEvent | null => {
   return { id: `mail-${m.id}`, title: m.title, start: s.toISOString(), end: (isNaN(e.getTime()) ? new Date(s.getTime() + 3600e3) : e).toISOString(), allDay, source: 'email', from: m.from, cat: MAIL_CAT[m.kind] };
 };
 
-export default function App() {
+export default function App({ initialLang = "en" }: { initialLang?: Lang }) {
   const [ready, setReady] = useState(false);
-  const [lang, setLang] = useState<Lang>('en');
+  const [lang, setLangState] = useState<Lang>(initialLang);
+  // null = follow the phone/computer language; 'en' | 'zh' = the person chose it (kept and synced)
+  const [langPick, setLangPick] = useState<Lang | null>(null);
+  useEffect(() => { document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en'; }, [lang]);
+  const setLang = (l: Lang) => { setLangState(l); setLangPick(l); save(K.langPick, l); };
   const [profile, setProfile] = useState<Profile | null>(null);
   const [manual, setManual] = useState<CalEvent[]>([]);
   const [ics, setIcs] = useState<{ url: string; events: CalEvent[]; at?: string } | null>(null);
@@ -91,8 +95,9 @@ export default function App() {
   const synced = useRef(false);
 
   useEffect(() => {
-    const stored = load<Lang | null>(K.lang, null);
-    setLang(stored ?? (navigator.language?.startsWith('zh') ? 'zh' : 'en'));
+    const picked = load<Lang | null>(K.langPick, null);
+    setLangPick(picked);
+    setLangState(picked ?? deviceLang());
     setProfile(load<Profile | null>(K.profile, null));
     setManual(load<CalEvent[]>(K.events, []));
     setIcs(load(K.ics, null));
@@ -106,7 +111,6 @@ export default function App() {
     if (code) { try { localStorage.setItem(PROMO_KEY, code.trim().toUpperCase().slice(0, 40)); } catch { /* private mode */ } history.replaceState(null, '', location.pathname); }
     setReady(true);
   }, []);
-  useEffect(() => { if (ready) save(K.lang, lang); }, [lang, ready]);
   useEffect(() => { if (ready) save(K.events, manual); }, [manual, ready]);
   useEffect(() => { if (ready) save(K.ics, ics); }, [ics, ready]);
   useEffect(() => { if (ready) save(K.mail, mail.slice(-200)); }, [mail, ready]);
@@ -177,7 +181,7 @@ export default function App() {
         setProfile(d.profile); save(K.profile, d.profile);
         if (Array.isArray(d.events)) setManual(d.events);
         if (d.icsUrl && !ics?.url) setIcs({ url: d.icsUrl, events: [] });
-        if (d.lang) setLang(d.lang);
+        if ((d.langPick === 'en' || d.langPick === 'zh') && !load<Lang | null>(K.langPick, null)) { setLangState(d.langPick); setLangPick(d.langPick); save(K.langPick, d.langPick); }
         if (d.mailKey && !mailKey) { save(K.mailKey, d.mailKey); setMailKey(d.mailKey); }
         if (d.gcalKey && !gcalKey) { save(K.gcalKey, d.gcalKey); setGcalKey(d.gcalKey); refreshGcal(d.gcalKey); }
       }
@@ -189,10 +193,10 @@ export default function App() {
   useEffect(() => {
     if (!ready || !account || !synced.current || !profile) return;
     const id = setTimeout(() => {
-      fetch('/api/sync', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ v: 1, updatedAt: new Date().toISOString(), profile, events: manual, icsUrl: ics?.url ?? null, lang, mailKey, gcalKey }) }).catch(() => {});
+      fetch('/api/sync', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ v: 1, updatedAt: new Date().toISOString(), profile, events: manual, icsUrl: ics?.url ?? null, lang, langPick, mailKey, gcalKey }) }).catch(() => {});
     }, 1500);
     return () => clearTimeout(id);
-  }, [ready, account, profile, manual, ics?.url, lang, mailKey, gcalKey]);
+  }, [ready, account, profile, manual, ics?.url, lang, langPick, mailKey, gcalKey]);
 
   // Fetch forwarded mail: on start, then every minute while the app is open.
   async function checkMail(key = mailKey, peek = false) {
@@ -283,7 +287,7 @@ export default function App() {
             onGcalRefresh={() => refreshGcal()}
             onGcalDisconnect={async () => { if (gcalKey) await fetch('/api/gcal/disconnect', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: gcalKey }) }).catch(() => {}); setGcal(null); setGcalNote(''); }} chart={chart} account={account} providers={providers}
             mail={mail} mailAddr={mailAddr} mailUsage={mailUsage} onEnableMail={enableMail} onCheckMail={() => checkMail()} onClearMail={() => setMail([])}
-            onReset={() => { if (confirm(t.resetConfirm)) { Object.values(K).forEach((k) => localStorage.removeItem(k)); location.reload(); } }} />
+            onReset={() => { if (confirm(t.resetConfirm)) { Object.values(K).filter((k) => k !== K.langPick).forEach((k) => localStorage.removeItem(k)); location.reload(); } }} />
         )}
       </main>
       <nav className="tabs">
@@ -1456,7 +1460,7 @@ function AccountCard({ lang, account, providers, compact = false }: { lang: Lang
           <div className="ev-title">{account.name || account.email}</div>
           <div className="small muted">{t.signedInNote}</div>
         </div>
-        {!compact && <button className="ghost" onClick={() => { Object.values(K).forEach((k) => localStorage.removeItem(k)); signOut({ redirectTo: '/' }); }}>{t.signOut}</button>}
+        {!compact && <button className="ghost" onClick={() => { Object.values(K).filter((k) => k !== K.langPick).forEach((k) => localStorage.removeItem(k)); signOut({ redirectTo: '/' }); }}>{t.signOut}</button>}
       </section>
     );
   }
@@ -1553,4 +1557,11 @@ function Icon({ name }: { name: Tab }) {
   if (name === 'home') return <svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 5.5l2 6.5-2 6.5-2-6.5z" /><path d="M12 3.5v1.5M12 19v1.5M3.5 12H5M19 12h1.5" /></svg>;
   if (name === 'chart') return <svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 3.5a4.25 4.25 0 0 1 0 8.5a4.25 4.25 0 0 0 0 8.5" /></svg>;
   return <svg {...p}><circle cx="12" cy="12" r="3" /><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" /></svg>;
+}
+
+// The device's preferred language: the first of the person's languages that FateCal speaks.
+function deviceLang(): Lang {
+  const list = (navigator.languages?.length ? navigator.languages : [navigator.language]).filter(Boolean);
+  for (const x of list) { const p = x.toLowerCase().slice(0, 2); if (p === 'zh') return 'zh'; if (p === 'en') return 'en'; }
+  return 'en';
 }
