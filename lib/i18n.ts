@@ -21,6 +21,14 @@ export const T = {
     language: 'Language',
     continue: 'See my reading',
     today: 'Today', ask: 'Ask', chart: 'Chart', settings: 'Settings', home: 'Feng Shui',
+    inv: {
+      title: 'Invite friends, both get a free month', pitch: 'Share your link. For every friend who signs up and adds their birth details, you each get 1 month of Basic free. 5 friends = 5 months.',
+      share: 'Share my link', copy: 'Copy', copied: 'Copied ✓', shareTitle: 'FateCal',
+      shareText: (l: string) => `I use FateCal to pick good days and hours from my BaZi chart. Sign up with my link and we both get a month of Basic free: ${l}`,
+      stats: (n: number, m: number) => (n ? `${n} friend${n > 1 ? 's' : ''} joined · you earned ${m} month${m === 1 ? '' : 's'}` : 'No friends joined yet'),
+      rules: (max: number) => `Counts once your friend finishes their birth details. New accounts only. Up to ${max} months.`,
+      banner: '🎁 A friend invited you: sign up and add your birth details, and you both get a month of Basic free.',
+    },
     rm: {
       title: 'Reminders', pitch: 'Get a nudge before each event, with its score, and a short reading every morning.',
       on: 'Turn on reminders', onHere: 'Reminders are on for this device ✓', off: 'Turn off on this device', test: 'Send a test',
@@ -252,6 +260,14 @@ export const T = {
     language: '语言',
     continue: '查看解读',
     today: '今日', ask: '问命', chart: '命盘', settings: '设置', home: '风水',
+    inv: {
+      title: '邀请好友，各得 1 个月', pitch: '把你的专属链接发给朋友。每有 1 位朋友注册并填好生日资料，你们俩各得 1 个月基础版。邀请 5 人就是 5 个月。',
+      share: '分享我的链接', copy: '复制', copied: '已复制 ✓', shareTitle: '随身吉历',
+      shareText: (l: string) => `我在用随身吉历，按八字帮我挑好日子、好时辰。用我的链接注册，你我各得 1 个月会员：${l}`,
+      stats: (n: number, m: number) => (n ? `已邀请 ${n} 人 · 获得 ${m} 个月` : '还没有朋友加入'),
+      rules: (max: number) => `朋友填好生日资料后才算数；仅限新注册用户；最多累计 ${max} 个月。`,
+      banner: '🎁 朋友邀请你：注册并填好生日资料，你们俩各得 1 个月基础版。',
+    },
     rm: {
       title: '提醒', pitch: '每个日程开始前提醒你，并附上评分；每天早上再发一条简短的运势。',
       on: '开启提醒', onHere: '这台设备已开启提醒 ✓', off: '在这台设备上关闭', test: '发一条测试',
@@ -483,6 +499,14 @@ export const T = {
     language: 'Idioma',
     continue: 'Ver mi lectura',
     today: 'Hoy', ask: 'Preguntar', chart: 'Carta', settings: 'Ajustes', home: 'Feng Shui',
+    inv: {
+      title: 'Invita amigos y ganen un mes gratis', pitch: 'Comparte tu enlace. Por cada amigo que se registre y agregue sus datos de nacimiento, ambos reciben 1 mes de Básico gratis. 5 amigos = 5 meses.',
+      share: 'Compartir mi enlace', copy: 'Copiar', copied: 'Copiado ✓', shareTitle: 'FateCal',
+      shareText: (l: string) => `Uso FateCal para elegir buenos días y horas según mi carta BaZi. Regístrate con mi enlace y ambos ganamos un mes de Básico gratis: ${l}`,
+      stats: (n: number, m: number) => (n ? `${n} amigo${n > 1 ? 's' : ''} se unieron · ganaste ${m} mes${m === 1 ? '' : 'es'}` : 'Aún no se ha unido ningún amigo'),
+      rules: (max: number) => `Cuenta cuando tu amigo completa sus datos de nacimiento. Solo cuentas nuevas. Hasta ${max} meses.`,
+      banner: '🎁 Un amigo te invitó: regístrate y agrega tus datos de nacimiento, y ambos reciben un mes de Básico gratis.',
+    },
     rm: {
       title: 'Recordatorios', pitch: 'Recibe un aviso antes de cada evento, con su puntuación, y una lectura breve cada mañana.',
       on: 'Activar recordatorios', onHere: 'Recordatorios activados en este dispositivo ✓', off: 'Desactivar en este dispositivo', test: 'Enviar una prueba',

@@ -17,6 +17,7 @@ import { LIMITS, PRICES, TRIAL_DAYS, money, type Interval, type Limits, type Pla
 // ---------------- billing ----------------
 interface BillInfo { plan: Plan; limits: Limits; billing: boolean; premiumOpen: boolean; status?: string; interval?: Interval; periodEnd?: string; trialEnd?: string; cancelAtPeriodEnd?: boolean; trialAvailable?: boolean; hasCustomer?: boolean; askedToday?: number; grantUntil?: string }
 const PROMO_KEY = 'fatecal.promo';
+const REF_KEY = 'fatecal.ref';
 const FREE_INFO: BillInfo = { plan: 'free', limits: LIMITS.free, billing: false, premiumOpen: false };
 const Bill = createContext<{ info: BillInfo; upgrade: (plan?: 'basic' | 'premium', interval?: Interval) => void; manage: () => void; refresh: () => void }>({ info: FREE_INFO, upgrade: () => {}, manage: () => {}, refresh: () => {} });
 const useBill = () => useContext(Bill);
@@ -113,8 +114,13 @@ export default function App({ initialLang = "en" }: { initialLang?: Lang }) {
     setGcal(load<GcalState | null>(K.gcal, null));
     setMailKey(load<string | null>(K.mailKey, null));
     setMailAddr(load<string | null>(K.mailAddr, null));
-    const code = new URLSearchParams(location.search).get('code');
-    if (code) { try { localStorage.setItem(PROMO_KEY, code.trim().toUpperCase().slice(0, 40)); } catch { /* private mode */ } history.replaceState(null, '', location.pathname); }
+    const qs = new URLSearchParams(location.search);
+    const code = qs.get('code'), ref = qs.get('r');
+    try {
+      if (code) localStorage.setItem(PROMO_KEY, code.trim().toUpperCase().slice(0, 40));
+      if (ref) localStorage.setItem(REF_KEY, ref.trim().toUpperCase().slice(0, 12));
+    } catch { /* private mode */ }
+    if (code || ref) history.replaceState(null, '', location.pathname);
     setReady(true);
   }, []);
   useEffect(() => { if (ready) save(K.events, manual); }, [manual, ready]);
@@ -143,6 +149,9 @@ export default function App({ initialLang = "en" }: { initialLang?: Lang }) {
   useEffect(() => {
     if (!ready || authed !== 'in') return;
     loadBill();
+    const ref = (() => { try { return localStorage.getItem(REF_KEY); } catch { return null; } })();
+    if (ref) fetch('/api/referral', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: ref }) })
+      .catch(() => {}).finally(() => { try { localStorage.removeItem(REF_KEY); } catch { /* ignore */ } });
     const promo = (() => { try { return localStorage.getItem(PROMO_KEY); } catch { return null; } })();
     if (promo) {
       fetch('/api/promo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: promo }) })
@@ -1554,6 +1563,7 @@ function Settings({ lang, setLang, ics, setIcs, billNote, gcal, gcalNote, onGcal
           <button className={lang === 'es' ? 'on' : ''} onClick={() => setLang('es')}>Español</button>
         </div>
       </section>
+      {ACCOUNTS_ON && <InviteCard lang={lang} />}
       {ACCOUNTS_ON && <ReminderCard lang={lang} />}
       {ACCOUNTS_ON && <WhatsAppCard lang={lang} />}
       <section className="card form">
@@ -1586,10 +1596,13 @@ function Settings({ lang, setLang, ics, setIcs, billNote, gcal, gcalNote, onGcal
 function PromoBanner({ lang }: { lang: Lang }) {
   const b = T[lang].bill;
   const [left, setLeft] = useState<number | null>(null);
+  const [invited, setInvited] = useState(false);
   useEffect(() => {
+    try { setInvited(!!localStorage.getItem(REF_KEY)); } catch { /* ignore */ }
     const c = (() => { try { return localStorage.getItem(PROMO_KEY); } catch { return null; } })();
     if (c) fetch(`/api/promo?code=${encodeURIComponent(c)}`).then((r) => r.json()).then((j) => setLeft(j.left)).catch(() => {});
   }, []);
+  if (invited && left === null) return <div className="promo" role="status">{T[lang].inv.banner}</div>;
   if (left === null) return null;
   return <div className="promo" role="status">{left > 0 ? b.promoBanner(left) : b.codeFull}</div>;
 }
@@ -1659,6 +1672,32 @@ function PlanCard({ lang, note }: { lang: Lang; note: string }) {
           <button className="ghost" disabled={busy || !code.trim()}>{b.redeem}</button>
         </form>
       )}
+    </section>
+  );
+}
+
+// ---------------- invite friends ----------------
+function InviteCard({ lang }: { lang: Lang }) {
+  const v = T[lang].inv;
+  const { refresh } = useBill();
+  const [st, setSt] = useState<{ code: string; link: string; count: number; months: number; max: number } | null>(null);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { fetch('/api/referral').then((r) => (r.ok ? r.json() : null)).then((j) => { if (j) { setSt(j); if (j.months) refresh(); } }).catch(() => {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!st) return null;
+  const text = v.shareText(st.link);
+  const copy = async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* ignore */ } };
+  const share = async () => { if ((navigator as any).share) await (navigator as any).share({ title: v.shareTitle, text, url: st.link }).catch(() => {}); else copy(); };
+  return (
+    <section className="card stack invite">
+      <div className="label">🎁 {v.title}</div>
+      <p className="small">{v.pitch}</p>
+      <div className="invlink">{st.link}</div>
+      <div className="row gap">
+        <button className="primary grow" onClick={share}>{v.share}</button>
+        <button className="ghost" onClick={copy}>{copied ? v.copied : v.copy}</button>
+      </div>
+      <p className="small"><b>{v.stats(st.count, st.months)}</b></p>
+      <p className="tiny">{v.rules(st.max)}</p>
     </section>
   );
 }

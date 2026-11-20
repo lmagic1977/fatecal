@@ -36,5 +36,7 @@ export async function PUT(req: Request) {
   if (body.length > 400_000) return NextResponse.json({ error: 'too_large' }, { status: 413 });
   try { JSON.parse(body); } catch { return NextResponse.json({ error: 'bad_json' }, { status: 400 }); }
   await put(pathFor(u.uid), body, { access: 'private', contentType: 'application/json', addRandomSuffix: false, allowOverwrite: true });
+  // first save with a profile settles an invite, if there was one
+  if (JSON.parse(body)?.profile) await import('@/lib/referral').then((m) => m.settle(u.uid)).catch(() => {});
   return NextResponse.json({ ok: true });
 }

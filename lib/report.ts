@@ -19,6 +19,7 @@ export function renderReport(s: Stats) {
     `累计账号：${s.accounts}　已填生日资料：${s.profiles}　今天打开过：${s.activeToday}`,
     `订阅：${subs}`,
     `赠送码：${gifts}`,
+    `邀请带来：今天 ${s.refToday}，近 7 天 ${s.ref7}`,
     '',
     '近 14 天每日新注册：',
     s.byDay.map((d) => `${d.day.slice(5)}  ${'■'.repeat(Math.min(d.n, 40))} ${d.n}`).join('\n'),

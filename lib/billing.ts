@@ -60,7 +60,7 @@ export async function planFor(u: { uid: string; email?: string }): Promise<Plan>
 }
 
 // ---- free-access codes (no card, no Stripe): a separate record so Stripe updates never overwrite it ----
-export interface Grant { plan: Exclude<Plan, 'free'>; until: string; code: string; at: string }
+export interface Grant { plan: Exclude<Plan, 'free'>; until: string; code: string; at: string; promo?: string; refMonths?: number }
 const grantPath = (uid: string) => `grants/${h(uid)}.json`;
 const promoPath = (code: string) => `promos/${code}.json`;
 export const readGrant = (uid: string) => readJson<Grant>(grantPath(uid));
@@ -77,11 +77,22 @@ export async function redeem(uid: string, raw: string): Promise<RedeemResult> {
   const code = raw.trim().toUpperCase();
   const p = PROMOS[code];
   if (!p) return { ok: false, error: 'invalid' };
-  if (await readGrant(uid)) return { ok: false, error: 'used' };
+  const old = await readGrant(uid);
+  if (old && (old.promo || PROMOS[old.code])) return { ok: false, error: 'used' };
   const n = (await readJson<{ n: number }>(promoPath(code)))?.n ?? 0;
   if (n >= p.max) return { ok: false, error: 'full' };
   await writeJson(promoPath(code), { n: n + 1 });
-  const grant: Grant = { plan: p.plan, code, at: new Date().toISOString(), until: new Date(Date.now() + p.days * 86400000).toISOString() };
+  const start = old && new Date(old.until) > new Date() ? new Date(old.until).getTime() : Date.now();
+  const grant: Grant = { ...(old ?? {}), plan: p.plan, code, promo: code, at: new Date().toISOString(), until: new Date(start + p.days * 86400000).toISOString() };
   await writeJson(grantPath(uid), grant);
   return { ok: true, grant };
+}
+
+// Add free Basic time (referrals). Stacks on top of any time already given.
+export async function addGrantDays(uid: string, days: number, code: string) {
+  const old = await readGrant(uid);
+  const start = old && new Date(old.until) > new Date() ? new Date(old.until).getTime() : Date.now();
+  const g: Grant = { ...(old ?? { code }), plan: old?.plan ?? 'basic', at: new Date().toISOString(), until: new Date(start + days * 86400000).toISOString(), refMonths: (old?.refMonths ?? 0) + Math.round(days / 30) };
+  await writeJson(grantPath(uid), g);
+  return g;
 }

@@ -65,14 +65,17 @@ export interface Stats {
   activeToday: number;
   subs: Record<string, number>;                  // e.g. { 'basic/active': 2, 'basic/trialing': 1 }
   gifts: Record<string, { used: number; max: number }>;
+  refToday: number; ref7: number;                // friends who joined through an invite
 }
 
 export async function stats(): Promise<Stats> {
   const today = dayKey();
   const days = Array.from({ length: 14 }, (_, i) => dayKey(new Date(Date.now() - i * 86400000)));
-  const [accounts, profiles, subs, signups] = await Promise.all([
-    listAll('accounts/'), listAll('users/'), listAll('subs/'), listAll('signups/'),
+  const [accounts, profiles, subs, signups, refs] = await Promise.all([
+    listAll('accounts/'), listAll('users/'), listAll('subs/'), listAll('signups/'), listAll('refdone/'),
   ]);
+  const refToday = refs.filter((r) => r.pathname.startsWith(`refdone/${today}/`)).length;
+  const ref7 = refs.filter((r) => days.slice(0, 7).some((d) => r.pathname.startsWith(`refdone/${d}/`))).length;
   const byDay = days.map((day) => ({ day, n: signups.filter((s) => s.pathname.startsWith(`signups/${day}/`)).length }));
   const recentPaths = signups.filter((s) => s.pathname.startsWith(`signups/${days[0]}/`) || s.pathname.startsWith(`signups/${days[1]}/`));
   const recent = (await Promise.all(recentPaths.map((s) => readJson<AccountRec>(s.pathname)))).filter(Boolean) as AccountRec[];
@@ -86,7 +89,7 @@ export async function stats(): Promise<Stats> {
   for (const s of subRecs) if (s && s.status !== 'none') subCount[`${s.plan}/${s.status}`] = (subCount[`${s.plan}/${s.status}`] ?? 0) + 1;
   const gifts: Stats['gifts'] = {};
   for (const [code, p] of Object.entries(PROMOS)) gifts[code] = { used: (await readJson<{ n: number }>(`promos/${code}.json`))?.n ?? 0, max: p.max };
-  return { today, accounts: accounts.length + extra, profiles: profiles.length, byDay, recent, activeToday, subs: subCount, gifts };
+  return { refToday, ref7, today, accounts: accounts.length + extra, profiles: profiles.length, byDay, recent, activeToday, subs: subCount, gifts };
 }
 
 export const adminEmails = () => (process.env.FATECAL_ADMINS ?? '').toLowerCase().split(',').map((x) => x.trim()).filter(Boolean);
