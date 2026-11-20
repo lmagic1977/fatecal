@@ -14,7 +14,8 @@ import type { MailItem } from '@/lib/mail';
 import { LIMITS, PRICES, TRIAL_DAYS, money, type Interval, type Limits, type Plan } from '@/lib/plans';
 
 // ---------------- billing ----------------
-interface BillInfo { plan: Plan; limits: Limits; billing: boolean; premiumOpen: boolean; status?: string; interval?: Interval; periodEnd?: string; trialEnd?: string; cancelAtPeriodEnd?: boolean; trialAvailable?: boolean; hasCustomer?: boolean; askedToday?: number }
+interface BillInfo { plan: Plan; limits: Limits; billing: boolean; premiumOpen: boolean; status?: string; interval?: Interval; periodEnd?: string; trialEnd?: string; cancelAtPeriodEnd?: boolean; trialAvailable?: boolean; hasCustomer?: boolean; askedToday?: number; grantUntil?: string }
+const PROMO_KEY = 'fatecal.promo';
 const FREE_INFO: BillInfo = { plan: 'free', limits: LIMITS.free, billing: false, premiumOpen: false };
 const Bill = createContext<{ info: BillInfo; upgrade: (plan?: 'basic' | 'premium', interval?: Interval) => void; manage: () => void; refresh: () => void }>({ info: FREE_INFO, upgrade: () => {}, manage: () => {}, refresh: () => {} });
 const useBill = () => useContext(Bill);
@@ -101,6 +102,8 @@ export default function App() {
     setGcal(load<GcalState | null>(K.gcal, null));
     setMailKey(load<string | null>(K.mailKey, null));
     setMailAddr(load<string | null>(K.mailAddr, null));
+    const code = new URLSearchParams(location.search).get('code');
+    if (code) { try { localStorage.setItem(PROMO_KEY, code.trim().toUpperCase().slice(0, 40)); } catch { /* private mode */ } history.replaceState(null, '', location.pathname); }
     setReady(true);
   }, []);
   useEffect(() => { if (ready) save(K.lang, lang); }, [lang, ready]);
@@ -130,6 +133,12 @@ export default function App() {
   useEffect(() => {
     if (!ready || authed !== 'in') return;
     loadBill();
+    const promo = (() => { try { return localStorage.getItem(PROMO_KEY); } catch { return null; } })();
+    if (promo) {
+      fetch('/api/promo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: promo }) })
+        .then((r) => r.json()).then((j) => { setTab('settings'); setBillNote(j.ok ? 'gift' : `gift_${j.error}`); loadBill(); })
+        .catch(() => {}).finally(() => { try { localStorage.removeItem(PROMO_KEY); } catch { /* ignore */ } });
+    }
     const r = new URLSearchParams(location.search).get('billing');
     if (r) { history.replaceState(null, '', location.pathname); setTab('settings'); setBillNote(r); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -368,6 +377,7 @@ function Landing({ lang, setLang, providers, onDone }: { lang: Lang; setLang: (l
         <Logo />
         <button className="lang" onClick={() => setLang(lang === 'en' ? 'zh' : 'en')} aria-label="Switch language">{lang === 'en' ? '中文' : 'EN'}</button>
       </header>
+      <PromoBanner lang={lang} />
       <div className="hero">
         <div className="eyebrow">{l.eyebrow}</div>
         <h1 className="display">{l.h1a}<br /><span>{l.h1b}</span></h1>
@@ -1318,13 +1328,37 @@ function Settings({ lang, setLang, ics, setIcs, billNote, gcal, gcalNote, onGcal
   );
 }
 
+// Shown on the landing page when someone arrives with ?code=…: what the gift is and how many places are left.
+function PromoBanner({ lang }: { lang: Lang }) {
+  const b = T[lang].bill;
+  const [left, setLeft] = useState<number | null>(null);
+  useEffect(() => {
+    const c = (() => { try { return localStorage.getItem(PROMO_KEY); } catch { return null; } })();
+    if (c) fetch(`/api/promo?code=${encodeURIComponent(c)}`).then((r) => r.json()).then((j) => setLeft(j.left)).catch(() => {});
+  }, []);
+  if (left === null) return null;
+  return <div className="promo" role="status">{left > 0 ? b.promoBanner(left) : b.codeFull}</div>;
+}
+
 function PlanCard({ lang, note }: { lang: Lang; note: string }) {
-  const { info, upgrade, manage } = useBill();
+  const { info, upgrade, manage, refresh } = useBill();
   const b = T[lang].bill;
   const [iv, setIv] = useState<Interval>('year');
   const [busy, setBusy] = useState(false);
   const d = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(tLocale(lang), { month: 'short', day: 'numeric', year: 'numeric' }) : '');
-  const msg = note === 'success' ? b.done : note === 'cancel' ? b.cancelled : note === 'unavailable' ? b.unavailable : '';
+  const [codeMsg, setCodeMsg] = useState('');
+  const [code, setCode] = useState('');
+  const giftMsg = (k: string, until?: string) => (k === 'gift' ? b.redeemed(d(until)) : k === 'gift_full' ? b.codeFull : k === 'gift_used' ? b.codeUsed : k === 'gift_invalid' ? b.codeInvalid : '');
+  const msg = codeMsg || (note === 'success' ? b.done : note === 'cancel' ? b.cancelled : note === 'unavailable' ? b.unavailable : giftMsg(note, info.grantUntil));
+  const paidLive = info.status === 'active' || info.status === 'trialing' || info.status === 'past_due';
+  async function redeemCode() {
+    if (!code.trim()) return;
+    setBusy(true);
+    const j = await fetch('/api/promo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }) }).then((r) => r.json()).catch(() => ({ ok: false, error: 'invalid' }));
+    setBusy(false);
+    setCodeMsg(giftMsg(j.ok ? 'gift' : `gift_${j.error}`, j.grant?.until));
+    if (j.ok) { setCode(''); refresh(); }
+  }
   const tiers: { id: Plan; list: string[] }[] = [{ id: 'free', list: b.freeList }, { id: 'basic', list: b.basicList }, { id: 'premium', list: b.premiumList }];
   return (
     <section className="card stack planbox">
@@ -1336,7 +1370,7 @@ function PlanCard({ lang, note }: { lang: Lang; note: string }) {
       {info.plan !== 'free' && (
         <>
           <p className="small muted">
-            {info.status === 'trialing' && info.trialEnd ? b.trialEnds(d(info.trialEnd)) : info.cancelAtPeriodEnd ? b.ends(d(info.periodEnd)) : info.periodEnd ? b.renews(d(info.periodEnd)) : ''}
+            {!paidLive && info.grantUntil ? b.giftUntil(d(info.grantUntil)) : info.status === 'trialing' && info.trialEnd ? b.trialEnds(d(info.trialEnd)) : info.cancelAtPeriodEnd ? b.ends(d(info.periodEnd)) : info.periodEnd ? b.renews(d(info.periodEnd)) : ''}
           </p>
           {info.hasCustomer && <button className="ghost" onClick={manage}>{b.manage}</button>}
         </>
@@ -1364,6 +1398,12 @@ function PlanCard({ lang, note }: { lang: Lang; note: string }) {
           </div>
           <p className="tiny">{b.trialNote} {b.cancelNote}</p>
         </>
+      )}
+      {!info.grantUntil && (
+        <form className="row gap" onSubmit={(e) => { e.preventDefault(); redeemCode(); }}>
+          <input className="grow" value={code} onChange={(e) => setCode(e.target.value)} placeholder={b.haveCode} aria-label={b.haveCode} autoCapitalize="characters" />
+          <button className="ghost" disabled={busy || !code.trim()}>{b.redeem}</button>
+        </form>
       )}
     </section>
   );

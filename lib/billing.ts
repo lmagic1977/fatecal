@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { get, put } from '@vercel/blob';
-import type { Interval, Plan } from './plans';
+import { PROMOS, type Interval, type Plan } from './plans';
 
 // One small private record per account: which plan, and the Stripe ids behind it.
 export interface Sub {
@@ -53,5 +53,35 @@ export async function planFor(u: { uid: string; email?: string }): Promise<Plan>
   const admins = (process.env.FATECAL_ADMINS ?? '').toLowerCase().split(',').map((x) => x.trim()).filter(Boolean);
   if (u.email && admins.includes(u.email.toLowerCase())) return 'premium';
   if (!process.env.STRIPE_SECRET_KEY) return 'basic';
-  return effectivePlan(await readSub(u.uid));
+  const paid = effectivePlan(await readSub(u.uid));
+  const g = await activeGrant(u.uid);
+  const rank: Record<Plan, number> = { free: 0, basic: 1, premium: 2 };
+  return g && rank[g.plan] > rank[paid] ? g.plan : paid;
+}
+
+// ---- free-access codes (no card, no Stripe): a separate record so Stripe updates never overwrite it ----
+export interface Grant { plan: Exclude<Plan, 'free'>; until: string; code: string; at: string }
+const grantPath = (uid: string) => `grants/${h(uid)}.json`;
+const promoPath = (code: string) => `promos/${code}.json`;
+export const readGrant = (uid: string) => readJson<Grant>(grantPath(uid));
+export async function activeGrant(uid: string): Promise<Grant | null> {
+  const g = await readGrant(uid);
+  return g && new Date(g.until) > new Date() ? g : null;
+}
+export async function promoLeft(code: string): Promise<number> {
+  const p = PROMOS[code]; if (!p) return 0;
+  return Math.max(0, p.max - ((await readJson<{ n: number }>(promoPath(code)))?.n ?? 0));
+}
+export type RedeemResult = { ok: true; grant: Grant } | { ok: false; error: 'invalid' | 'used' | 'full' };
+export async function redeem(uid: string, raw: string): Promise<RedeemResult> {
+  const code = raw.trim().toUpperCase();
+  const p = PROMOS[code];
+  if (!p) return { ok: false, error: 'invalid' };
+  if (await readGrant(uid)) return { ok: false, error: 'used' };
+  const n = (await readJson<{ n: number }>(promoPath(code)))?.n ?? 0;
+  if (n >= p.max) return { ok: false, error: 'full' };
+  await writeJson(promoPath(code), { n: n + 1 });
+  const grant: Grant = { plan: p.plan, code, at: new Date().toISOString(), until: new Date(Date.now() + p.days * 86400000).toISOString() };
+  await writeJson(grantPath(uid), grant);
+  return { ok: true, grant };
 }

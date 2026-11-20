@@ -26,3 +26,9 @@ export const LIMITS: Record<Plan, Limits> = {
   premium: { askPerDay: 200, photos: true, manualPerDay: 1000, syncCalendar: true, mailForwarding: true, fullReasons: true, nextYearStars: true, homeChecksPerMonth: 1000 },
 };
 export const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+
+// Free-access codes. Each person can use one code once; `max` is the total number of people.
+// A link like https://fatecal.com/?code=FATECAL2027 fills it in automatically after sign-up.
+export const PROMOS: Record<string, { plan: Exclude<Plan, 'free'>; days: number; max: number }> = {
+  FATECAL2027: { plan: 'basic', days: 365, max: 100 },
+};

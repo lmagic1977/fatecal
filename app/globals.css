@@ -459,3 +459,5 @@ input:focus-visible, select:focus-visible { outline-color: var(--brand); }
 .tier.hl { background: #fff; box-shadow: 0 0 0 2px var(--brand), var(--shadow); }
 .tier ul { margin: 0; padding-left: 18px; font-size: 13.5px; color: var(--soft); line-height: 1.6; }
 .tier .tag { align-self: flex-start; }
+
+.promo{margin:0 0 12px;padding:12px 14px;border-radius:14px;background:linear-gradient(90deg,#6D5DF5,#9A6BF0 55%,#F08BA8);color:#fff;font-weight:600;font-size:14px;line-height:1.45}
