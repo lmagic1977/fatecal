@@ -2,6 +2,7 @@ import { del, get, list } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 import { INBOUND_DOMAIN, MailItem } from '@/lib/mail';
 import { addressToken, validReadKey } from '@/lib/mailkey';
+import { MONTHLY_LIMIT, readUsage } from '@/lib/quota';
 
 export const runtime = 'nodejs';
 
@@ -12,7 +13,8 @@ export async function POST(req: Request) {
   let token: string;
   try { token = addressToken(key); } catch { return NextResponse.json({ error: 'not_configured' }, { status: 503 }); }
   const address = `${token}@${INBOUND_DOMAIN}`;
-  if (peek) return NextResponse.json({ address, items: [] });
+  const usage = { used: (await readUsage(token)).n, limit: MONTHLY_LIMIT };
+  if (peek) return NextResponse.json({ address, items: [], usage });
 
   const items: MailItem[] = [];
   try {
@@ -25,8 +27,8 @@ export async function POST(req: Request) {
     }
     if (blobs.length) await del(blobs.map((b) => b.url));
   } catch {
-    return NextResponse.json({ address, items: [], error: 'storage' });
+    return NextResponse.json({ address, items: [], usage, error: 'storage' });
   }
   items.sort((a, b) => a.receivedAt.localeCompare(b.receivedAt));
-  return NextResponse.json({ address, items });
+  return NextResponse.json({ address, items, usage });
 }

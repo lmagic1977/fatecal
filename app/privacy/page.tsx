@@ -25,7 +25,7 @@ export default function Privacy() {
       <ul>
         <li><b>Vercel</b> hosts the site and stores account data and forwarded-email extracts.</li>
         <li><b>Google</b> and <b>Meta (Facebook)</b> handle sign-in if you choose them.</li>
-        <li><b>Postmark</b> sends your email sign-in codes, and receives emails you forward to your FateCal address and passes them to us; we keep only a short extract until your app collects it.</li>
+        <li><b>Postmark</b> sends your email sign-in codes, and receives emails you forward to your FateCal address and passes them to us; we keep only a short extract until your app collects it, plus a count of how many emails reached your address this month (to apply a monthly limit). Past the limit, new emails are not read or stored.</li>
         <li><b>Twilio</b> sends and checks SMS sign-in codes if you sign in with your mobile number; it receives your number for that purpose.</li>
         <li><b>Anthropic</b> processes FateBot questions as described above.</li>
         <li><b>Google Fonts</b> serves the site's fonts.</li>

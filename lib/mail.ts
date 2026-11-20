@@ -1,6 +1,6 @@
 export const INBOUND_DOMAIN = 'in.fatecal.com';
 
-export type MailKind = 'meeting' | 'order' | 'travel' | 'bill' | 'contract' | 'verify' | 'other';
+export type MailKind = 'meeting' | 'order' | 'travel' | 'bill' | 'contract' | 'verify' | 'limit' | 'other';
 
 // What FateCal keeps about a forwarded email: a short extract, never the full body.
 export interface MailItem {

@@ -49,3 +49,13 @@ assert.equal(annualStars(2027).N, 5); assert.equal(annualStars(2024).C, 3);
 assert.equal(liChunYear(new Date(2027, 0, 20)), 2026); assert.equal(liChunYear(new Date(2027, 1, 10)), 2027);
 assert.equal(readHome('N', kuaOf(1984, 'm'), ['water'], 2026).match, false); // West-group person, East-group house
 console.log('feng shui checks passed');
+// forwarding cap: read up to the limit, then one notice, then drop
+import { countOne } from '../lib/quota';
+{
+  let u = { n: 0, warned: false };
+  const acts: string[] = [];
+  for (let i = 0; i < 5; i++) { const r = countOne(u, 3); u = r.usage; acts.push(r.action); }
+  assert.deepEqual(acts, ['read', 'read', 'read', 'notice', 'drop']);
+  assert.equal(u.n, 5);
+  console.log('mail cap checks passed');
+}

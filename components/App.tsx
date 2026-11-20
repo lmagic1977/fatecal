@@ -37,7 +37,7 @@ const isoLocalDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-$
 // "YYYY-MM-DD" / "YYYY-MM-DDTHH:mm" are local wall times; anything with an offset is absolute.
 const parseMailTime = (v: string) => (/[zZ]|[+-]\d{2}:?\d{2}$/.test(v) ? new Date(v) : new Date(v.length === 10 ? `${v}T00:00` : v));
 const mailToEvent = (m: MailItem): CalEvent | null => {
-  if (!m.start || m.kind === 'verify') return null;
+  if (!m.start || m.kind === 'verify' || m.kind === 'limit') return null;
   const s = parseMailTime(m.start);
   if (isNaN(s.getTime())) return null;
   const allDay = !!m.allDay || m.start.length === 10;
@@ -58,6 +58,7 @@ export default function App() {
   const [account, setAccount] = useState<Account | null>(null);
   const [providers, setProviders] = useState<string[]>([]);
   const [seed, setSeed] = useState<Seed | null>(null);
+  const [mailUsage, setMailUsage] = useState<{ used: number; limit: number } | null>(null);
   const [authed, setAuthed] = useState<'checking' | 'out' | 'in'>('checking');
   const synced = useRef(false);
 
@@ -121,6 +122,7 @@ export default function App() {
       .then((r) => (r.ok ? r.json() : null)).catch(() => null);
     if (!j) return -1;
     if (j.address) { setMailAddr(j.address); save(K.mailAddr, j.address); }
+    if (j.usage) setMailUsage(j.usage);
     if (j.items?.length) setMail((m) => [...m, ...j.items.filter((x: MailItem) => !m.some((y) => y.id === x.id))]);
     return j.items?.length ?? 0;
   }
@@ -184,7 +186,7 @@ export default function App() {
         {tab === 'chart' && <ChartView lang={lang} chart={chart} profile={profile} onEdit={(p) => { setProfile(p); save(K.profile, p); }} />}
         {tab === 'settings' && (
           <Settings lang={lang} setLang={setLang} ics={ics} setIcs={setIcs} chart={chart} account={account} providers={providers}
-            mail={mail} mailAddr={mailAddr} onEnableMail={enableMail} onCheckMail={() => checkMail()} onClearMail={() => setMail([])}
+            mail={mail} mailAddr={mailAddr} mailUsage={mailUsage} onEnableMail={enableMail} onCheckMail={() => checkMail()} onClearMail={() => setMail([])}
             onReset={() => { if (confirm(t.resetConfirm)) { Object.values(K).forEach((k) => localStorage.removeItem(k)); location.reload(); } }} />
         )}
       </main>
@@ -1160,7 +1162,7 @@ function ChartView({ lang, chart, profile, onEdit }: { lang: Lang; chart: Chart;
 
 // ---------------- settings ----------------
 
-function Settings({ lang, setLang, ics, setIcs, onReset, chart, mail, mailAddr, onEnableMail, onCheckMail, onClearMail, account, providers }: { account: Account | null; providers: string[]; lang: Lang; setLang: (l: Lang) => void; ics: { url: string; events: CalEvent[]; at?: string } | null; setIcs: (v: { url: string; events: CalEvent[]; at?: string } | null) => void; onReset: () => void; chart: Chart; mail: MailItem[]; mailAddr: string | null; onEnableMail: () => Promise<void>; onCheckMail: () => Promise<number>; onClearMail: () => void }) {
+function Settings({ lang, setLang, ics, setIcs, onReset, chart, mail, mailAddr, mailUsage, onEnableMail, onCheckMail, onClearMail, account, providers }: { account: Account | null; providers: string[]; lang: Lang; setLang: (l: Lang) => void; ics: { url: string; events: CalEvent[]; at?: string } | null; setIcs: (v: { url: string; events: CalEvent[]; at?: string } | null) => void; onReset: () => void; chart: Chart; mail: MailItem[]; mailAddr: string | null; mailUsage: { used: number; limit: number } | null; onEnableMail: () => Promise<void>; onCheckMail: () => Promise<number>; onClearMail: () => void }) {
   const t = T[lang];
   const [url, setUrl] = useState(ics?.url ?? '');
   const [state, setState] = useState<'idle' | 'busy' | 'error'>('idle');
@@ -1195,7 +1197,7 @@ function Settings({ lang, setLang, ics, setIcs, onReset, chart, mail, mailAddr, 
         )}
         {state === 'error' && <p className="danger small">{t.icsError}</p>}
       </section>
-      <MailSection lang={lang} chart={chart} mail={mail} mailAddr={mailAddr} onEnable={onEnableMail} onCheck={onCheckMail} onClear={onClearMail} />
+      <MailSection lang={lang} chart={chart} mail={mail} mailAddr={mailAddr} usage={mailUsage} onEnable={onEnableMail} onCheck={onCheckMail} onClear={onClearMail} />
       <p className="muted small">{t.privacy}</p>
       <button className="ghost danger danger-btn" onClick={onReset}>{t.reset}</button>
       <Footer lang={lang} />
@@ -1244,13 +1246,16 @@ function AccountCard({ lang, account, providers, compact = false }: { lang: Lang
 
 const KIND_CAT: Record<string, Category> = { meeting: 'meeting', order: 'money', travel: 'travel', bill: 'money', contract: 'signing', other: 'general' };
 
-function MailSection({ lang, chart, mail, mailAddr, onEnable, onCheck, onClear }: { lang: Lang; chart: Chart; mail: MailItem[]; mailAddr: string | null; onEnable: () => Promise<void>; onCheck: () => Promise<number>; onClear: () => void }) {
+function MailSection({ lang, chart, mail, mailAddr, usage, onEnable, onCheck, onClear }: { lang: Lang; chart: Chart; mail: MailItem[]; mailAddr: string | null; usage: { used: number; limit: number } | null; onEnable: () => Promise<void>; onCheck: () => Promise<number>; onClear: () => void }) {
   const t = T[lang];
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const [copied, setCopied] = useState(false);
   const verify = [...mail].reverse().find((m) => m.kind === 'verify');
-  const recent = mail.filter((m) => m.kind !== 'verify').slice(-8).reverse();
+  const recent = mail.filter((m) => m.kind !== 'verify' && m.kind !== 'limit').slice(-8).reverse();
+  // a limit notice only matters in the month it arrived
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  const limitHit = mail.some((m) => m.kind === 'limit' && m.receivedAt.slice(0, 7) === thisMonth) || (!!usage && usage.used > usage.limit);
   return (
     <section className="card form">
       <div className="label">{t.forwarding}</div>
@@ -1267,6 +1272,8 @@ function MailSection({ lang, chart, mail, mailAddr, onEnable, onCheck, onClear }
             <button className="ghost" onClick={() => { navigator.clipboard?.writeText(mailAddr); setCopied(true); }}>{copied ? t.copied : t.copy}</button>
           </div>
           <details className="explain"><summary>{t.howForward}</summary><ul className="reasons">{t.forwardSteps.map((x) => <li key={x}>{x}</li>)}</ul></details>
+          {usage && <p className="tiny" aria-live="polite">{t.mailUsage(Math.min(usage.used, usage.limit), usage.limit)}</p>}
+          {limitHit && usage && <p className="small danger" role="alert">{t.limitHit(usage.limit)}</p>}
           {verify && (
             <div className="suggest">
               <p className="small"><b>{t.gmailConfirm}</b> {verify.verifyCode ? `${t.code}: ${verify.verifyCode}` : ''}</p>

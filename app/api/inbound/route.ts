@@ -4,6 +4,7 @@ import ical from 'node-ical';
 import { NextResponse } from 'next/server';
 import { INBOUND_DOMAIN, MailItem, MailKind } from '@/lib/mail';
 import { validToken } from '@/lib/mailkey';
+import { MONTHLY_LIMIT, countOne, readUsage, writeUsage } from '@/lib/quota';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -95,8 +96,24 @@ export async function POST(req: Request) {
   const received = new Date(p.Date ?? Date.now()).toISOString();
   const base = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, receivedAt: received, from, subject };
 
+  const isGmailConfirm = /forwarding-noreply@google\.com/i.test(from) || /gmail forwarding confirmation|forwarding confirmation/i.test(subject);
+
+  // Monthly cap per address (Gmail's forwarding confirmation is always let through).
+  if (!isGmailConfirm) {
+    const { usage, action } = countOne(await readUsage(token));
+    await writeUsage(token, usage);
+    if (action !== 'read') {
+      if (action === 'notice') {
+        const notice: MailItem = { ...base, kind: 'limit', title: 'Monthly limit reached', summary: `More than ${MONTHLY_LIMIT} emails arrived this month.` };
+        await put(`inbox/${token}/${notice.id}.json`, JSON.stringify(notice), { access: 'private', contentType: 'application/json', addRandomSuffix: false });
+      }
+      // 200 so Postmark does not retry; the email is not read or stored.
+      return NextResponse.json({ ok: true, ignored: 'monthly_limit' });
+    }
+  }
+
   let item: MailItem;
-  if (/forwarding-noreply@google\.com/i.test(from) || /gmail forwarding confirmation|forwarding confirmation/i.test(subject)) {
+  if (isGmailConfirm) {
     // Gmail asks the forwarding address to confirm; show the link to the user so they can approve it.
     const link = text.match(/https:\/\/mail(?:-settings)?\.google\.com\/mail\/[^\s<>"]+/)?.[0];
     const code = subject.match(/#(\d{6,12})/)?.[1] ?? text.match(/Confirmation code:\s*(\d{6,12})/i)?.[1];
