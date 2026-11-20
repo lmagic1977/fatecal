@@ -67,7 +67,7 @@ export const BRANCH: Record<string, { el: Element; pinyin: string; animal: strin
   寅: { el: 'wood', pinyin: 'Yin', animal: 'Tiger', zh: '虎' }, 卯: { el: 'wood', pinyin: 'Mao', animal: 'Rabbit', zh: '兔' },
   辰: { el: 'earth', pinyin: 'Chen', animal: 'Dragon', zh: '龙' }, 巳: { el: 'fire', pinyin: 'Si', animal: 'Snake', zh: '蛇' },
   午: { el: 'fire', pinyin: 'Wu', animal: 'Horse', zh: '马' }, 未: { el: 'earth', pinyin: 'Wei', animal: 'Goat', zh: '羊' },
-  申: { el: 'metal', pinyin: 'Shen', animal: 'Monkey', zh: '猴' }, 酉: { el: 'metal', pinyin: 'You', animal: 'Rooster', zh: '鸡' },
+  申: { el: 'metal', pinyin: 'Shen', animal: 'Monkey', zh: '猴' }, 酉: { el: 'metal', pinyin: 'Yǒu', animal: 'Rooster', zh: '鸡' },
   戌: { el: 'earth', pinyin: 'Xu', animal: 'Dog', zh: '狗' }, 亥: { el: 'water', pinyin: 'Hai', animal: 'Pig', zh: '猪' },
 };
 
@@ -281,6 +281,7 @@ export function scoreMoment(chart: Chart, when: Date, category: Category = 'gene
 
 export interface DaySummary {
   score: number; verdict: Verdict; ganZhi: string; yi: string[]; ji: string[]; reasons: Reason[]; bestHours: { start: number; score: number }[];
+  hours: { start: number; score: number }[]; // every 2-hour block from 7 AM to 11 PM, in order
 }
 
 // A day's overall reading (scored at noon, general activity) plus its best two-hour blocks.
@@ -289,11 +290,12 @@ export function scoreDay(chart: Chart, date: Date): DaySummary {
   const base = scoreMoment(chart, noon, 'general');
   const dayOnly = base.reasons.filter((r) => r.scope === 'day');
   const lunar = Solar.fromDate(noon).getLunar();
-  const hours = [7, 9, 11, 13, 15, 17, 19].map((h) => ({
+  const blocks = [7, 9, 11, 13, 15, 17, 19, 21].map((h) => ({
     start: h, score: scoreMoment(chart, new Date(date.getFullYear(), date.getMonth(), date.getDate(), h, 30), 'general').score,
-  })).sort((a, b) => b.score - a.score);
+  }));
+  const hours = [...blocks].sort((a, b) => b.score - a.score);
   const score = Math.max(5, Math.min(98, 60 + dayOnly.reduce((a, r) => a + r.delta, 0)));
-  return { score, verdict: verdictOf(score), ganZhi: base.dayGanZhi, yi: lunar.getDayYi(), ji: lunar.getDayJi(), reasons: dayOnly, bestHours: hours.slice(0, 2).sort((a, b) => a.start - b.start) };
+  return { score, verdict: verdictOf(score), ganZhi: base.dayGanZhi, yi: lunar.getDayYi(), ji: lunar.getDayJi(), reasons: dayOnly, bestHours: hours.slice(0, 2).sort((a, b) => a.start - b.start), hours: blocks };
 }
 
 // Modern activities shown as "good for / avoid" in place of the raw almanac list.
