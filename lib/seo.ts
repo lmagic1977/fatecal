@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { T } from './i18n';
 import { langPrefix, type L } from './goodDays';
 import { PRICES } from './plans';
+import { FACEBOOK_URL } from './site';
 
 // hreflang + canonical for a path that exists in all three languages
 export function alternates(lang: L, path: string): Metadata['alternates'] {
@@ -45,6 +46,7 @@ export function homeJsonLd(lang: L) {
   return [
     {
       '@context': 'https://schema.org', '@type': 'WebApplication', name: 'FateCal', alternateName: '随身吉历', url: `https://fatecal.com${langPrefix(lang) || '/'}`,
+      sameAs: [FACEBOOK_URL],
       applicationCategory: 'LifestyleApplication', operatingSystem: 'Any (web browser)', inLanguage: lang === 'zh' ? 'zh-CN' : lang, description: HOME_META[lang].description,
       offers: [
         { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'USD' },

@@ -1,4 +1,4 @@
-import { CONTACT_EMAIL, SHOPPING_ON } from '@/lib/site';
+import { CONTACT_EMAIL, FACEBOOK_URL, SHOPPING_ON } from '@/lib/site';
 
 export default function Footer({ lang = 'en' }: { lang?: 'en' | 'zh' | 'es' }) {
   const zh = lang === 'zh';
@@ -9,6 +9,7 @@ export default function Footer({ lang = 'en' }: { lang?: 'en' | 'zh' | 'es' }) {
       <a href={`${lang === 'en' ? '' : `/${lang}`}/good-days`}>{L('Good days by month', '每月黄道吉日', 'Días propicios')}</a>
       <a href="/privacy">{L('Privacy', '隐私政策', 'Privacidad')}</a>
       <a href="/terms">{L('Terms', '服务条款', 'Términos')}</a>
+      <a href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer me">Facebook</a>
       <a href={`mailto:${CONTACT_EMAIL}`}>{L('Contact', '联系我们', 'Contacto')}</a>
       <span>© {new Date().getFullYear()} FateCal</span>
     </footer>
