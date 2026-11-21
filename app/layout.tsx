@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import MetaPixel from '@/components/MetaPixel';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://fatecal.com'),
@@ -17,13 +18,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
+        {process.env.NEXT_PUBLIC_FB_DOMAIN_VERIFICATION ? (
+          <meta name="facebook-domain-verification" content={process.env.NEXT_PUBLIC_FB_DOMAIN_VERIFICATION} />
+        ) : null}
         <script
           async
           src="https://tp-em.com/NjAzNTUx.js?t=603551"
           data-cmp-ab="2"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <MetaPixel />
+        {children}
+      </body>
     </html>
   );
 }

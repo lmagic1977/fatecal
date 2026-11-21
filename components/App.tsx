@@ -13,6 +13,7 @@ import { CONTACT_EMAIL, ACCOUNTS_ON, SHOPPING_ON } from '@/lib/site';
 import type { MailItem } from '@/lib/mail';
 import { expandRepeats, dateKey } from '@/lib/recur';
 import { LIMITS, PRICES, TRIAL_DAYS, money, type Interval, type Limits, type Plan } from '@/lib/plans';
+import { trackMeta, trackMetaOnce, markRegistrationPending, consumeRegistrationPending } from '@/lib/meta';
 
 // ---------------- billing ----------------
 interface BillInfo { plan: Plan; limits: Limits; billing: boolean; premiumOpen: boolean; status?: string; interval?: Interval; periodEnd?: string; trialEnd?: string; cancelAtPeriodEnd?: boolean; trialAvailable?: boolean; hasCustomer?: boolean; askedToday?: number; grantUntil?: string }
@@ -162,10 +163,19 @@ export default function App({ initialLang = "en", pathLang }: { initialLang?: La
     if (r) { history.replaceState(null, '', location.pathname); setTab('settings'); setBillNote(r); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, authed]);
+  // Meta ads: report a trial start / paid subscription once per account and billing period.
+  useEffect(() => {
+    if (!account || !bill.status) return;
+    const me = account.email || account.name || 'me';
+    const paid = bill.plan === 'basic' || bill.plan === 'premium' ? PRICES[bill.plan][bill.interval ?? 'month'].cents / 100 : undefined;
+    if (bill.status === 'trialing') trackMetaOnce(`fatecal.metaTrial:${me}`, 'StartTrial', { value: paid, currency: 'USD' });
+    if (bill.status === 'active') trackMetaOnce(`fatecal.metaSub:${me}:${bill.periodEnd ?? ''}`, 'Subscribe', { value: paid, currency: 'USD' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bill.status, bill.periodEnd, account]);
   async function upgrade(plan: 'basic' | 'premium' = 'basic', interval: Interval = 'month') {
     const r = await fetch('/api/billing/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan, interval, lang }) }).catch(() => null);
     const j = r ? await r.json().catch(() => null) : null;
-    if (j?.url) { location.href = j.url; return; }
+    if (j?.url) { trackMeta('InitiateCheckout', { content_name: plan, value: PRICES[plan][interval].cents / 100, currency: 'USD' }); location.href = j.url; return; }
     if (r?.status === 409) { manage(); return; }
     setTab('settings'); setBillNote('unavailable');
   }
@@ -192,6 +202,8 @@ export default function App({ initialLang = "en", pathLang }: { initialLang?: La
       }
       save(K.owner, me);
       const d = j.data;
+      // Meta ads: a just-completed sign-in whose account has no saved profile yet is a new registration.
+      if (consumeRegistrationPending() && !d?.profile) trackMetaOnce(`fatecal.metaReg:${me}`, 'CompleteRegistration');
       if (d?.profile) {
         setProfile(d.profile); save(K.profile, d.profile);
         if (Array.isArray(d.events)) setManual(d.events);
@@ -582,6 +594,7 @@ function SignUp({ lang, providers }: { lang: Lang; providers: string[] }) {
     setBusy(true);
     const r = await signIn('otp', { channel: mode, to, code: code.trim(), redirect: false }).catch(() => null);
     if (!r || r.error) { setBusy(false); setErr(t.badCode); return; }
+    markRegistrationPending();
     location.href = '/';
   }
 
@@ -594,7 +607,7 @@ function SignUp({ lang, providers }: { lang: Lang; providers: string[] }) {
       {mode === 'pick' && (
         <>
           {social.map((p) => (
-            <button key={p} className="social" onClick={() => signIn(p, { redirectTo: '/' })}>
+            <button key={p} className="social" onClick={() => { markRegistrationPending(); signIn(p, { redirectTo: '/' }); }}>
               <ProviderIcon id={p} /> {p === 'google' ? t.withGoogle : t.withFacebook}
             </button>
           ))}
@@ -1888,7 +1901,7 @@ function AccountCard({ lang, account, providers, compact = false }: { lang: Lang
     <section className={compact ? 'stack' : 'card stack'}>
       {!compact && <div className="label">{t.account}</div>}
       {providers.map((p) => (
-        <button key={p} className="social" onClick={() => signIn(p, { redirectTo: '/' })}>
+        <button key={p} className="social" onClick={() => { markRegistrationPending(); signIn(p, { redirectTo: '/' }); }}>
           <ProviderIcon id={p} /> {p === 'google' ? t.withGoogle : t.withFacebook}
         </button>
       ))}
