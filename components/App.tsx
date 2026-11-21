@@ -423,7 +423,7 @@ export const ZH_NAME = '随身吉历';
 function Logo({ big = false, lang }: { big?: boolean; lang?: Lang }) {
   return (
     <span className={`logowrap ${big ? 'big' : ''}`}>
-      <img className={big ? 'logo big' : 'logo'} src="/logo.svg" alt={lang === 'zh' ? `${ZH_NAME} FateCal` : 'FateCal'} width={big ? 172 : 115} height={big ? 42 : 28} />
+      <img className={big ? 'logo big' : 'logo'} src="/logo.svg" alt={lang === 'zh' ? `${ZH_NAME} FateCal` : 'FateCal'} width={big ? 187 : 130} height={big ? 46 : 32} />
       {lang === 'zh' && <span className="zhname">{ZH_NAME}</span>}
     </span>
   );

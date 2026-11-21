@@ -202,8 +202,8 @@ a:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 .dial { flex: 0 0 104px; }
 
 /* brand + landing */
-.logo { display: block; height: 28px; width: auto; }
-.logo.big { height: 42px; margin-bottom: 8px; }
+.logo { display: block; height: 32px; width: auto; }
+.logo.big { height: 46px; margin-bottom: 8px; }
 .eyebrow { font-size: 13px; font-weight: 600; color: var(--red); letter-spacing: .3px; display: flex; align-items: center; gap: 8px; }
 .eyebrow::before { content: ''; width: 18px; height: 1px; background: currentColor; }
 .eyebrow.sm { font-size: 12px; }
@@ -484,8 +484,8 @@ input:focus-visible, select:focus-visible { outline-color: var(--brand); }
 .logowrap.big{gap:9px;margin-bottom:8px}
 .logowrap.big .logo.big{margin-bottom:0}
 /* Chinese name set to the same visual size and ink as the FateCal wordmark */
-.zhname{font-family:'Songti SC','STSong','Noto Serif SC','Source Han Serif SC',serif;font-weight:700;font-size:20px;line-height:1;color:#1D1A33;white-space:nowrap;transform:translateY(1px)}
-.logowrap.big .zhname{font-size:30px}
+.zhname{font-family:'PingFang SC','Hiragino Sans GB','Noto Sans SC','Microsoft YaHei',sans-serif;font-weight:800;font-size:20px;line-height:1;white-space:nowrap;background:linear-gradient(90deg,#6A3FE8,#B24BC8 55%,#EE5D8E);-webkit-background-clip:text;background-clip:text;color:transparent}
+.logowrap.big .zhname{font-size:29px}
 .invlink{font:600 13px/1.4 ui-monospace,Menlo,monospace;padding:10px 12px;border-radius:12px;background:#F6F4FD;word-break:break-all}
 .invite{border:1px solid rgba(109,93,245,.25)}
 

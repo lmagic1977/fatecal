@@ -52,7 +52,7 @@ function LangLinks({ lang, path }: { lang: L; path: string }) {
 function Head({ lang }: { lang: L }) {
   return (
     <header className="gd-top">
-      <a href={langPrefix(lang) || '/'} className="gd-brand"><img src="/logo.svg" alt="FateCal" width={115} height={28} />{lang === 'zh' && <span className="zhname">随身吉历</span>}</a>
+      <a href={langPrefix(lang) || '/'} className="gd-brand"><img src="/logo.svg" alt="FateCal" width={130} height={32} />{lang === 'zh' && <span className="zhname">随身吉历</span>}</a>
     </header>
   );
 }
