@@ -8,7 +8,7 @@ const h = (s: string) => createHash('sha256').update(s).digest('hex').slice(0, 3
 const TZ = 'America/Los_Angeles';
 export const dayKey = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: TZ }); // YYYY-MM-DD
 
-export interface AccountRec { createdAt: string; provider: string; email?: string; name?: string; lastSeen: string }
+export interface AccountRec { createdAt: string; provider: string; email?: string; name?: string; lastSeen: string; src?: string }
 
 async function readJson<T>(path: string): Promise<T | null> {
   try {
@@ -35,6 +35,20 @@ export async function recordSignIn(uid: string, provider: string, email?: string
 
 // Called when a signed-in person opens the app. People who signed up before this log existed get a record
 // marked legacy (no sign-up day), and everyone's lastSeen moves to today.
+// Where a new account came from (utm_source / fbclid / referrer), recorded once, within 2 days of sign-up.
+export async function setSource(uid: string, src: string) {
+  const clean = src.toLowerCase().replace(/[^a-z0-9_.-]/g, '').slice(0, 40);
+  if (!clean) return;
+  const path = `accounts/${h(uid)}.json`;
+  const rec = await readJson<AccountRec & { legacy?: boolean }>(path);
+  if (!rec || rec.src || rec.legacy || Date.now() - new Date(rec.createdAt).getTime() > 2 * 86400000) return;
+  await writeJson(path, { ...rec, src: clean });
+  const day = dayKey(new Date(rec.createdAt));
+  const sp = `signups/${day}/${h(uid)}.json`;
+  const s = await readJson<AccountRec>(sp);
+  if (s) await writeJson(sp, { ...s, src: clean });
+}
+
 export async function touch(uid: string, email?: string | null, name?: string | null) {
   const path = `accounts/${h(uid)}.json`;
   const old = await readJson<AccountRec & { legacy?: boolean }>(path);
@@ -62,6 +76,7 @@ export interface Stats {
   today: string; accounts: number; profiles: number;
   byDay: { day: string; n: number }[];          // last 14 days, newest first
   recent: AccountRec[];                          // sign-ups today and yesterday
+  sources7: Record<string, number>;              // sign-ups in the last 7 days by source
   activeToday: number;
   subs: Record<string, number>;                  // e.g. { 'basic/active': 2, 'basic/trialing': 1 }
   gifts: Record<string, { used: number; max: number }>;
@@ -79,6 +94,10 @@ export async function stats(): Promise<Stats> {
   const byDay = days.map((day) => ({ day, n: signups.filter((s) => s.pathname.startsWith(`signups/${day}/`)).length }));
   const recentPaths = signups.filter((s) => s.pathname.startsWith(`signups/${days[0]}/`) || s.pathname.startsWith(`signups/${days[1]}/`));
   const recent = (await Promise.all(recentPaths.map((s) => readJson<AccountRec>(s.pathname)))).filter(Boolean) as AccountRec[];
+  const week = signups.filter((s) => days.slice(0, 7).some((d) => s.pathname.startsWith(`signups/${d}/`)));
+  const weekRecs = (await Promise.all(week.map((s) => readJson<AccountRec>(s.pathname)))).filter(Boolean) as AccountRec[];
+  const sources7: Record<string, number> = {};
+  for (const r of weekRecs) sources7[r.src ?? 'direct'] = (sources7[r.src ?? 'direct'] ?? 0) + 1;
   recent.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const activeToday = accounts.filter((a) => dayKey(a.uploadedAt) === today).length;
   // people with a saved profile but no account record yet (signed up before the log) still count
@@ -89,7 +108,7 @@ export async function stats(): Promise<Stats> {
   for (const s of subRecs) if (s && s.status !== 'none') subCount[`${s.plan}/${s.status}`] = (subCount[`${s.plan}/${s.status}`] ?? 0) + 1;
   const gifts: Stats['gifts'] = {};
   for (const [code, p] of Object.entries(PROMOS)) gifts[code] = { used: (await readJson<{ n: number }>(`promos/${code}.json`))?.n ?? 0, max: p.max };
-  return { refToday, ref7, today, accounts: accounts.length + extra, profiles: profiles.length, byDay, recent, activeToday, subs: subCount, gifts };
+  return { sources7, refToday, ref7, today, accounts: accounts.length + extra, profiles: profiles.length, byDay, recent, activeToday, subs: subCount, gifts };
 }
 
 export const adminEmails = () => (process.env.FATECAL_ADMINS ?? '').toLowerCase().split(',').map((x) => x.trim()).filter(Boolean);

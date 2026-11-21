@@ -19,6 +19,7 @@ import { trackMeta, trackMetaOnce, markRegistrationPending, consumeRegistrationP
 interface BillInfo { plan: Plan; limits: Limits; billing: boolean; premiumOpen: boolean; status?: string; interval?: Interval; periodEnd?: string; trialEnd?: string; cancelAtPeriodEnd?: boolean; trialAvailable?: boolean; hasCustomer?: boolean; askedToday?: number; grantUntil?: string }
 const PROMO_KEY = 'fatecal.promo';
 const REF_KEY = 'fatecal.ref';
+const SRC_KEY = 'fatecal.src';
 const FREE_INFO: BillInfo = { plan: 'free', limits: LIMITS.free, billing: false, premiumOpen: false };
 const Bill = createContext<{ info: BillInfo; upgrade: (plan?: 'basic' | 'premium', interval?: Interval) => void; manage: () => void; refresh: () => void }>({ info: FREE_INFO, upgrade: () => {}, manage: () => {}, refresh: () => {} });
 const useBill = () => useContext(Bill);
@@ -117,11 +118,19 @@ export default function App({ initialLang = "en", pathLang }: { initialLang?: La
     setMailAddr(load<string | null>(K.mailAddr, null));
     const qs = new URLSearchParams(location.search);
     const code = qs.get('code'), ref = qs.get('r');
+    // first-touch source: utm_source, else a Facebook/Instagram click id, else the referring site
+    try {
+      if (!localStorage.getItem(SRC_KEY)) {
+        const rf = document.referrer ? new URL(document.referrer).hostname.replace(/^www\./, '') : '';
+        const src = qs.get('utm_source') || (qs.get('fbclid') ? 'facebook' : '') || (ref ? 'invite' : '') || (code ? 'giftcode' : '') || (rf && !rf.endsWith('fatecal.com') ? rf : '');
+        if (src) localStorage.setItem(SRC_KEY, src.slice(0, 40));
+      }
+    } catch { /* private mode */ }
     try {
       if (code) localStorage.setItem(PROMO_KEY, code.trim().toUpperCase().slice(0, 40));
       if (ref) localStorage.setItem(REF_KEY, ref.trim().toUpperCase().slice(0, 12));
     } catch { /* private mode */ }
-    if (code || ref) history.replaceState(null, '', location.pathname);
+    if (code || ref || qs.get('utm_source') || qs.get('fbclid')) history.replaceState(null, '', location.pathname);
     setReady(true);
   }, []);
   useEffect(() => { if (ready) save(K.events, manual); }, [manual, ready]);
@@ -150,6 +159,8 @@ export default function App({ initialLang = "en", pathLang }: { initialLang?: La
   useEffect(() => {
     if (!ready || authed !== 'in') return;
     loadBill();
+    const src = (() => { try { return localStorage.getItem(SRC_KEY); } catch { return null; } })();
+    if (src) fetch('/api/track', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ src }) }).catch(() => {});
     const ref = (() => { try { return localStorage.getItem(REF_KEY); } catch { return null; } })();
     if (ref) fetch('/api/referral', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: ref }) })
       .catch(() => {}).finally(() => { try { localStorage.removeItem(REF_KEY); } catch { /* ignore */ } });
