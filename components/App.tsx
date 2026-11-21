@@ -1387,12 +1387,13 @@ function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Ch
           </div>
         </div>
         {yearLocked && !nextOk && <Locked lang={lang} text={t.bill.lockedYear} />}
-        <p className="small muted">{f.starsIntro} {zh ? `${yr}年 ${yearGanZhi(yr)}，` : `${yr} (${yearGanZhi(yr)}), `}{f.starsFrom}</p>
+        <p className="small">{f.starsIntro}</p>
         {(() => {
           const where = (n: number) => { const g = GRID.find((x) => stars[x] === n)!; return g === 'C' ? f.center : dn(g); };
           return <p className="small fsyear"><b>{f.plain.year(where(8), where(4), where(5))}</b></p>;
         })()}
-        <div className="fsgrid" role="grid">
+        <div className="fsmap-cap tiny">⬆ {dn('N')} · {f.mapCap}</div>
+        <div className="fsgrid fshouse" role="grid">
           {GRID.map((g) => {
             const st = FLY[stars[g]];
             return (
@@ -1406,14 +1407,25 @@ function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Ch
             );
           })}
         </div>
-        {!c ? <p className="small muted">{f.tapCell}</p> : (
+        {c && (
           <div className="suggest">
-            <p className="small"><b>{cell === 'C' ? f.center : dn(cell as Dir)} · {c[lang]}</b>: {L3(lang, c.en2, c.zh2, c.es2)}</p>
+            <p className="small"><b>{cell === 'C' ? f.center : dn(cell as Dir)} · {FLY_PLAIN[stars[cell!]].emoji} {FLY_PLAIN[stars[cell!]][lang]}</b>: {L3(lang, c.en2, c.zh2, c.es2)}</p>
             <p className="small">{L3(lang, c.fixEn, c.fixZh, c.fixEs)}</p>
-            {SHOPPING_ON && c.query && <a className="link shopping-link" href={amazon(c.query)} target="_blank" rel="sponsored nofollow noopener noreferrer">{f.shop}</a>}
-            {c.query && <p className="tiny muted">{f.shopNote}</p>}
           </div>
         )}
+        <h3 className="fslist-h">{f.listH}</h3>
+        <ul className="fslist">
+          {[...GRID].sort((x, y) => ({ good: 0, neutral: 1, bad: 2 }[FLY[stars[x]].tone] - { good: 0, neutral: 1, bad: 2 }[FLY[stars[y]].tone])).map((g) => {
+            const st = FLY[stars[g]], pl = FLY_PLAIN[stars[g]];
+            return (
+              <li key={g} className={st.tone}>
+                <div className="row between"><b>{pl.emoji} {g === 'C' ? f.center : dn(g)} · {pl[lang]}</b><span className={`fstag ${st.tone}`}>{st.tone === 'bad' ? f.calm : f.good}</span></div>
+                <p className="small">{L3(lang, st.fixEn, st.fixZh, st.fixEs)}</p>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="tiny muted">{f.starsFrom2} · {zh ? `${yr}年 ${yearGanZhi(yr)}，` : `${yr} (${yearGanZhi(yr)}), `}{f.starsFrom}</p>
       </section>
 
       <section className="card form">

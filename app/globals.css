@@ -519,3 +519,12 @@ input:focus-visible, select:focus-visible { outline-color: var(--brand); }
 .fsyear{margin:6px 0 10px}
 .fscell .fsemoji{font-size:24px;line-height:1.1}
 .fscell .fslabel{font-size:13px;font-weight:700;line-height:1.2}
+.fsmap-cap{text-align:center;margin:4px 0 6px;font-weight:600}
+.fshouse{border:3px solid #cfc8f5;border-radius:18px;padding:6px}
+.fslist-h{margin:16px 0 6px;font-size:16px}
+.fslist{list-style:none;padding:0;margin:0;display:grid;gap:8px}
+.fslist li{padding:10px 12px;border-radius:14px;background:#F6F4FD}
+.fslist li.good{background:#ECF8F1}.fslist li.bad{background:#FCEDEC}
+.fslist li p{margin:4px 0 0}
+.fstag{font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.fstag.good,.fstag.neutral{background:#d6f0e0;color:#246b3d}.fstag.bad{background:#f8d4cf;color:#a3392a}
