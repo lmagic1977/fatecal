@@ -480,9 +480,11 @@ input:focus-visible, select:focus-visible { outline-color: var(--brand); }
 .langpick .caret{font-size:11px;opacity:.6}
 .langpick select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}
 .langpick:focus-within{outline:2px solid var(--brand);outline-offset:2px}
-.logowrap{display:inline-flex;align-items:center;gap:8px}
-.logowrap.big{flex-direction:column;align-items:flex-start;gap:0}
-.zhname{font-weight:700;font-size:15px;color:var(--brand);letter-spacing:1px;white-space:nowrap}
-.logowrap.big .zhname{font-size:18px;margin:-2px 0 8px}
+.logowrap{display:inline-flex;align-items:center;gap:6px}
+.logowrap.big{gap:9px;margin-bottom:8px}
+.logowrap.big .logo.big{margin-bottom:0}
+/* Chinese name set to the same visual size and ink as the FateCal wordmark */
+.zhname{font-family:'Songti SC','STSong','Noto Serif SC','Source Han Serif SC',serif;font-weight:700;font-size:20px;line-height:1;color:#1D1A33;white-space:nowrap;transform:translateY(1px)}
+.logowrap.big .zhname{font-size:30px}
 .invlink{font:600 13px/1.4 ui-monospace,Menlo,monospace;padding:10px 12px;border-radius:12px;background:#F6F4FD;word-break:break-all}
 .invite{border:1px solid rgba(109,93,245,.25)}
