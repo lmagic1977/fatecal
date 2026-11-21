@@ -107,8 +107,8 @@ export const T = {
       deskPts: [['☀️', 'Daily score', 'know today\'s rhythm at a glance'], ['🗓️', 'Calendar check', 'signing, travel, launches, with better time slots'], ['🧭', 'Feng shui', 'your best directions and this year\'s flying stars'], ['🔒', 'Private by default', 'your data is never sold or used for ads']],
     },
     lp: {
-      eyebrow: 'BaZi × your calendar',
-      h1a: 'Pick a good time', h1b: 'for what matters.',
+      eyebrow: 'Powered by BaZi',
+      h1a: 'Better timing.', h1b: 'Better plans.',
       sub: 'Signing, client meetings, moving house. FateCal reads your schedule against your BaZi chart and the traditional almanac: which times don\'t suit you, why, and what to pick instead.',
       start: 'Get my reading', tryIt: 'Try a reschedule',
       tryNote: 'The demo uses a made-up schedule. No birth details needed.',
@@ -587,8 +587,8 @@ export const T = {
       deskPts: [['☀️', 'Puntuación diaria', 'el ritmo de hoy de un vistazo'], ['🗓️', 'Revisión del calendario', 'firmas, viajes, lanzamientos, con mejores horarios'], ['🧭', 'Feng shui', 'tus mejores direcciones y las estrellas voladoras del año'], ['🔒', 'Privado por defecto', 'tus datos nunca se venden ni se usan para anuncios']],
     },
     lp: {
-      eyebrow: 'BaZi × tu calendario',
-      h1a: 'Elige un buen momento', h1b: 'para lo que importa.',
+      eyebrow: 'Con el poder del BaZi',
+      h1a: 'Mejor momento.', h1b: 'Mejores planes.',
       sub: 'Firmas, reuniones con clientes, mudanzas. FateCal lee tu agenda según tu carta BaZi y el almanaque tradicional: qué momentos no te convienen, por qué y cuál elegir en su lugar.',
       start: 'Ver mi lectura', tryIt: 'Prueba a reprogramar',
       tryNote: 'La demo usa una agenda inventada. No hace falta tu fecha de nacimiento.',

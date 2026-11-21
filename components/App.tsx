@@ -78,7 +78,7 @@ export default function App({ initialLang = "en", pathLang }: { initialLang?: La
   const [langPick, setLangPick] = useState<Lang | null>(null);
   useEffect(() => {
     document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang;
-    document.title = lang === 'zh' ? '随身吉历 FateCal：给重要的事，挑个好时间' : lang === 'es' ? 'FateCal: tu asesor BaZi para la vida real' : 'FateCal: your BaZi advisor for real life';
+    document.title = lang === 'zh' ? '随身吉历 FateCal：给重要的事，挑个好时间' : lang === 'es' ? 'FateCal: Mejor momento. Mejores planes.' : 'FateCal: Better timing. Better plans. Powered by BaZi';
   }, [lang]);
   const setLang = (l: Lang) => { setLangState(l); setLangPick(l); save(K.langPick, l); };
   const [profile, setProfile] = useState<Profile | null>(null);

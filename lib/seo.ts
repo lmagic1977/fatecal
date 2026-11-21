@@ -15,7 +15,7 @@ export function alternates(lang: L, path: string): Metadata['alternates'] {
 
 export const HOME_META: Record<L, { title: string; description: string; keywords: string[] }> = {
   en: {
-    title: 'FateCal: BaZi calendar that picks good days and hours for your plans',
+    title: 'FateCal: Better timing. Better plans. Powered by BaZi',
     description: 'FateCal reads your BaZi (Four Pillars) chart and your schedule, scores every plan against the Chinese almanac, and suggests a better day or hour. Feng shui directions, flying stars and an AI advisor included.',
     keywords: ['BaZi calendar', 'Four Pillars of Destiny', 'Chinese almanac', 'auspicious dates', 'good days', 'Huangli', 'feng shui', 'date selection'],
   },
@@ -25,7 +25,7 @@ export const HOME_META: Record<L, { title: string; description: string; keywords
     keywords: ['八字日历', '黄道吉日', '老黄历', '择日', '吉日查询', '风水', '流年飞星', '随身吉历'],
   },
   es: {
-    title: 'FateCal: calendario BaZi que elige buenos días y horas para tus planes',
+    title: 'FateCal: Mejor momento. Mejores planes. Con el poder del BaZi',
     description: 'FateCal lee tu carta BaZi (Cuatro Pilares) y tu agenda, puntúa cada plan según el almanaque chino y sugiere un mejor día u hora. Incluye direcciones de feng shui, estrellas voladoras y un asesor con IA.',
     keywords: ['calendario BaZi', 'Cuatro Pilares del Destino', 'almanaque chino', 'días propicios', 'feng shui'],
   },

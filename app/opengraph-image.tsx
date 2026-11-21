@@ -14,8 +14,8 @@ export default function OG() {
           <img src={ICON} width={120} height={120} alt="" />
           <div style={{ fontSize: 96, fontWeight: 700, color: '#1D1A33' }}>FateCal</div>
         </div>
-        <div style={{ fontSize: 52, color: '#6D5DF5', marginTop: 40, maxWidth: 1000 }}>Pick a good time for what matters.</div>
-        <div style={{ fontSize: 32, color: '#5B5876', marginTop: 16, maxWidth: 1000 }}>Your BaZi chart, read against your real schedule.</div>
+        <div style={{ fontSize: 52, color: '#6D5DF5', marginTop: 40, maxWidth: 1000 }}>Better timing. Better plans.</div>
+        <div style={{ fontSize: 32, color: '#5B5876', marginTop: 16, maxWidth: 1000 }}>Powered by BaZi.</div>
       </div>
     ),
     size,
