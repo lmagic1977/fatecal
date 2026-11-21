@@ -512,3 +512,10 @@ input:focus-visible, select:focus-visible { outline-color: var(--brand); }
 .gd article p{margin:0 0 12px}
 .gd-table tr.tone-good td:first-child{color:#2f8a4e}
 .gd-table tr.tone-care td:first-child{color:#c0503d}
+.fsplain{list-style:none;padding:0;margin:8px 0 4px;display:grid;gap:10px}
+.fsplain li{display:flex;gap:10px;align-items:flex-start;font-size:15px;line-height:1.45}
+.fsplain li>span{font-size:20px;line-height:1.2;flex:none}
+.fsdetails{margin-top:10px}.fsdetails summary{cursor:pointer;color:var(--brand);font-weight:600}
+.fsyear{margin:6px 0 10px}
+.fscell .fsemoji{font-size:24px;line-height:1.1}
+.fscell .fslabel{font-size:13px;font-weight:700;line-height:1.2}

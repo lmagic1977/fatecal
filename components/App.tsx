@@ -33,7 +33,7 @@ function Locked({ lang, text }: { lang: Lang; text: string }) {
     </div>
   );
 }
-import { Sex, Dir, DIRS, DIR_NAME, DIR_ELEMENT, STAR8, FLY, kuaOf, annualStars, liChunYear, yearGanZhi, readHome, dirFromDegrees } from '@/lib/fengshui';
+import { Sex, Dir, DIRS, DIR_NAME, DIR_ELEMENT, STAR8, FLY, FLY_PLAIN, kuaOf, annualStars, liChunYear, yearGanZhi, readHome, dirFromDegrees } from '@/lib/fengshui';
 
 interface Profile { name: string; birth: BirthInput; place: string; sex?: Sex }
 type Tab = 'today' | 'ask' | 'home' | 'chart' | 'settings';
@@ -1342,23 +1342,40 @@ function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Ch
           </>
         ) : (
           <>
-            <p><b>{f.gua}:</b> {kua.number} {zh ? kua.trigram.zh : kua.trigram.en} · {kua.group === 'east' ? f.eastGroup : f.westGroup}</p>
-            <div className="small"><b>{f.goodDirs}</b></div>
-            <ul className="reasons">
-              {kua.dirs.filter((d) => STAR8[d.star].good).map((d) => (
-                <li key={d.star}><span className="plus">{dn(d.dir)}</span> {STAR8[d.star][lang]}: {L3(lang, STAR8[d.star].useEn, STAR8[d.star].useZh, STAR8[d.star].useEs)}</li>
-              ))}
-            </ul>
-            <div className="small"><b>{f.badDirs}</b></div>
-            <ul className="reasons">
-              {kua.dirs.filter((d) => !STAR8[d.star].good).map((d) => (
-                <li key={d.star}><span className="minus">{dn(d.dir)}</span> {STAR8[d.star][lang]}: {L3(lang, STAR8[d.star].useEn, STAR8[d.star].useZh, STAR8[d.star].useEs)}</li>
-              ))}
-            </ul>
-            <p className="small muted">{f.dirsHow}</p>
+            {(() => {
+              const p = f.plain;
+              const at = (st: string) => kua.dirs.find((d) => d.star === st)!.dir;
+              const col = zh ? '：' : ': ', pa = (x: string) => (zh ? `（${x}）` : ` (${x})`);
+              const bad = kua.dirs.filter((d) => !STAR8[d.star].good && d.star !== 'jueming').map((d) => dn(d.dir)).join(zh ? '、' : ', ');
+              return (
+                <ul className="fsplain">
+                  <li><span>🛏</span><div>{p.bed} <b className="plus">{dn(at('tianyi'))}</b>{pa(p.health)} {p.or} <b className="plus">{dn(at('yannian'))}</b>{pa(p.love)}</div></li>
+                  <li><span>💼</span><div>{p.desk}{col}<b className="plus">{dn(at('shengqi'))}</b></div></li>
+                  <li><span>📖</span><div>{p.study}{col}<b className="plus">{dn(at('fuwei'))}</b></div></li>
+                  <li><span>🚽</span><div>{p.utility}{col}<b>{bad}</b></div></li>
+                  <li><span>🚫</span><div>{p.never} <b className="minus">{dn(at('jueming'))}</b></div></li>
+                </ul>
+              );
+            })()}
+            <details className="fsdetails">
+              <summary className="small">{f.plain.why}</summary>
+              <p className="small">{f.plain.kua(zh ? kua.trigram.zh : kua.trigram.en, kua.group === 'east' ? f.eastGroup : f.westGroup)}</p>
+              <div className="small"><b>{f.goodDirs}</b></div>
+              <ul className="reasons">
+                {kua.dirs.filter((d) => STAR8[d.star].good).map((d) => (
+                  <li key={d.star}><span className="plus">{dn(d.dir)}</span> {STAR8[d.star][lang]}: {L3(lang, STAR8[d.star].useEn, STAR8[d.star].useZh, STAR8[d.star].useEs)}</li>
+                ))}
+              </ul>
+              <div className="small"><b>{f.badDirs}</b></div>
+              <ul className="reasons">
+                {kua.dirs.filter((d) => !STAR8[d.star].good).map((d) => (
+                  <li key={d.star}><span className="minus">{dn(d.dir)}</span> {STAR8[d.star][lang]}: {L3(lang, STAR8[d.star].useEn, STAR8[d.star].useZh, STAR8[d.star].useEs)}</li>
+                ))}
+              </ul>
+              <p className="small"><b>{f.elDirs}:</b> {DIRS.filter((d) => chart.favorable.includes(DIR_ELEMENT[d])).map((d) => `${dn(d)} (${el(DIR_ELEMENT[d])})`).join(zh ? '、' : ', ')}</p>
+            </details>
           </>
         )}
-        <p className="small"><b>{f.elDirs}:</b> {DIRS.filter((d) => chart.favorable.includes(DIR_ELEMENT[d])).map((d) => `${dn(d)} (${el(DIR_ELEMENT[d])})`).join(zh ? '、' : ', ')}</p>
       </section>
 
       <section className="card">
@@ -1371,6 +1388,10 @@ function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Ch
         </div>
         {yearLocked && !nextOk && <Locked lang={lang} text={t.bill.lockedYear} />}
         <p className="small muted">{f.starsIntro} {zh ? `${yr}年 ${yearGanZhi(yr)}，` : `${yr} (${yearGanZhi(yr)}), `}{f.starsFrom}</p>
+        {(() => {
+          const where = (n: number) => { const g = GRID.find((x) => stars[x] === n)!; return g === 'C' ? f.center : dn(g); };
+          return <p className="small fsyear"><b>{f.plain.year(where(8), where(4), where(5))}</b></p>;
+        })()}
         <div className="fsgrid" role="grid">
           {GRID.map((g) => {
             const st = FLY[stars[g]];
@@ -1378,8 +1399,9 @@ function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Ch
               <button key={g} role="gridcell" className={`fscell ${st.tone} ${cell === g ? 'sel' : ''}`} onClick={() => setCell(cell === g ? null : g)} aria-pressed={cell === g}
                 aria-label={`${g === 'C' ? f.center : dn(g)}: ${st[lang]}, ${L3(lang, st.en2, st.zh2, st.es2)}`}>
                 <span className="tiny">{g === 'C' ? f.center : dn(g)}</span>
-                <b>{stars[g]}</b>
-                <span className="tiny">{zh ? st.zh.split(' ')[1] : L3(lang, st.en2, st.zh2, st.es2).split(/[ ,:]/)[0]}</span>
+                <b className="fsemoji" aria-hidden="true">{FLY_PLAIN[stars[g]].emoji}</b>
+                <span className="fslabel">{FLY_PLAIN[stars[g]][lang]}</span>
+                <span className="tiny muted">{stars[g]}</span>
               </button>
             );
           })}

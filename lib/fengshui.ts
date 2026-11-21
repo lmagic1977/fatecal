@@ -163,3 +163,16 @@ export function fengshuiContext(birthYear: number, sex: Sex | undefined, favorab
     flyingStarsNextYear: { year: `${y + 1} ${yearGanZhi(y + 1)} (starts about Feb 4, ${y + 1})`, sectors: stars(y + 1) },
   };
 }
+
+// Plain-language labels for the annual flying stars (shown in the grid instead of the classical names)
+export const FLY_PLAIN: Record<number, { emoji: string; en: string; zh: string; es: string }> = {
+  1: { emoji: '💼', en: 'Career & love', zh: '事业·桃花', es: 'Carrera y amor' },
+  2: { emoji: '🤒', en: 'Health: keep calm', zh: '注意健康', es: 'Salud: calma' },
+  3: { emoji: '🗣️', en: 'Arguments', zh: '易吵架', es: 'Discusiones' },
+  4: { emoji: '📚', en: 'Study & exams', zh: '读书考试', es: 'Estudios' },
+  5: { emoji: '⚠️', en: 'Worst spot', zh: '最要避开', es: 'El peor' },
+  6: { emoji: '🏅', en: 'Promotion', zh: '升职·偏财', es: 'Ascensos' },
+  7: { emoji: '🔒', en: 'Loss & theft', zh: '防破财', es: 'Pérdidas' },
+  8: { emoji: '💰', en: 'Wealth', zh: '财位', es: 'Riqueza' },
+  9: { emoji: '🎉', en: 'Celebrations', zh: '喜事·人气', es: 'Celebraciones' },
+};
