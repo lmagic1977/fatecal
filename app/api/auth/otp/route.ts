@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { emailEnabled, phoneEnabled, normEmail, normPhone, sendEmailCode, sendPhoneCode } from '@/lib/otp';
+import { emailEnabled, phoneEnabled, normEmail, normPhone, sendEmailCode, sendPhoneCode, isTestEmail } from '@/lib/otp';
 
 export const runtime = 'nodejs';
 
@@ -23,6 +23,7 @@ export async function POST(req: Request) {
     if (!emailEnabled()) return NextResponse.json({ error: 'disabled' }, { status: 503 });
     const to = normEmail(String(body.to ?? ''));
     if (!to) return NextResponse.json({ error: 'invalid' }, { status: 400 });
+    if (isTestEmail(to)) return NextResponse.json({ result: 'sent' }); // test login: the fixed code works, nothing is sent
     if (limited(`to:${to}`, 5, 60 * 60_000)) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
     const r = await sendEmailCode(to, lang);
     return NextResponse.json({ result: r }, { status: r === 'sent' ? 200 : r === 'wait' ? 429 : 502 });

@@ -34,6 +34,11 @@ const write = (id: string, rec: Rec) => put(pathFor(id), JSON.stringify(rec), { 
 
 export type SendResult = 'sent' | 'wait' | 'failed';
 
+// A fixed test login for testers (people or AI agents without a real inbox).
+// TEST_LOGIN_EMAIL + TEST_LOGIN_CODE (6 digits): no email is sent; the code always works for that address.
+export const isTestEmail = (e: string) => !!process.env.TEST_LOGIN_EMAIL && !!process.env.TEST_LOGIN_CODE && e === process.env.TEST_LOGIN_EMAIL.trim().toLowerCase();
+export const testCodeOk = (e: string, code: string) => isTestEmail(e) && code === process.env.TEST_LOGIN_CODE;
+
 export async function sendEmailCode(email: string, lang: 'en' | 'zh' | 'es'): Promise<SendResult> {
   const id = `email:${email}`;
   const old = await read(id);

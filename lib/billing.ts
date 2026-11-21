@@ -52,6 +52,7 @@ export async function readUsageCount(uid: string, what: string, period: 'day' | 
 export async function planFor(u: { uid: string; email?: string }): Promise<Plan> {
   const admins = (process.env.FATECAL_ADMINS ?? '').toLowerCase().split(',').map((x) => x.trim()).filter(Boolean);
   if (u.email && admins.includes(u.email.toLowerCase())) return 'premium';
+  if (u.email && process.env.TEST_LOGIN_EMAIL && u.email.toLowerCase() === process.env.TEST_LOGIN_EMAIL.trim().toLowerCase()) return 'basic';
   if (!process.env.STRIPE_SECRET_KEY) return 'basic';
   const paid = effectivePlan(await readSub(u.uid));
   const g = await activeGrant(u.uid);
