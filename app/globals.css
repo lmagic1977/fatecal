@@ -509,3 +509,6 @@ input:focus-visible, select:focus-visible { outline-color: var(--brand); }
 .gd-table th{background:#F6F4FD}
 .gd-nav{display:flex;justify-content:space-between;gap:10px;margin:20px 0;flex-wrap:wrap}
 .gd-months{columns:2;padding-left:18px}
+.gd article p{margin:0 0 12px}
+.gd-table tr.tone-good td:first-child{color:#2f8a4e}
+.gd-table tr.tone-care td:first-child{color:#c0503d}

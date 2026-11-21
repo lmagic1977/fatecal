@@ -4,4 +4,5 @@ declare module 'lunar-javascript' {
     fromYmd(y: number, m: number, d: number): any;
     fromDate(date: Date): any;
   };
+  export const Lunar: { fromYmd(y: number, m: number, d: number): any };
 }
