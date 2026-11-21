@@ -70,7 +70,7 @@ const mailToEvent = (m: MailItem): CalEvent | null => {
   return { id: `mail-${m.id}`, title: m.title, start: s.toISOString(), end: (isNaN(e.getTime()) ? new Date(s.getTime() + 3600e3) : e).toISOString(), allDay, source: 'email', from: m.from, cat: MAIL_CAT[m.kind] };
 };
 
-export default function App({ initialLang = "en" }: { initialLang?: Lang }) {
+export default function App({ initialLang = "en", pathLang }: { initialLang?: Lang; pathLang?: Lang }) {
   const [ready, setReady] = useState(false);
   const [lang, setLangState] = useState<Lang>(initialLang);
   // null = follow the phone/computer language; 'en' | 'zh' = the person chose it (kept and synced)
@@ -104,7 +104,7 @@ export default function App({ initialLang = "en" }: { initialLang?: Lang }) {
   useEffect(() => {
     const picked = load<Lang | null>(K.langPick, null);
     setLangPick(picked);
-    setLangState(picked ?? deviceLang());
+    setLangState(pathLang ?? picked ?? deviceLang());
     setProfile(load<Profile | null>(K.profile, null));
     setManual(load<CalEvent[]>(K.events, []));
     setIcs(load(K.ics, null));
