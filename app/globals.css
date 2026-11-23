@@ -528,3 +528,4 @@ input:focus-visible, select:focus-visible { outline-color: var(--brand); }
 .fslist li p{margin:4px 0 0}
 .fstag{font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
 .fstag.good,.fstag.neutral{background:#d6f0e0;color:#246b3d}.fstag.bad{background:#f8d4cf;color:#a3392a}
+.shell { padding-top: env(safe-area-inset-top); }
