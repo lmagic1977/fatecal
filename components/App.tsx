@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, forwardRef, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   BirthInput, CalEvent, Category, Chart, computeChart, readEvent, scoreDay, dayActivities, activityName, reasonText, ANIMAL_ES, STEM, BRANCH, ELEMENT_NAME, Element, HIDDEN,
 } from '@/lib/engine';
@@ -941,6 +941,24 @@ function relDay(day: Date, lang: Lang): { label: string; word: string } {
   return { label, word };
 }
 
+// Text box that grows taller with what you type (width stays the same); Enter sends, Shift+Enter adds a line
+const GrowBox = forwardRef<HTMLTextAreaElement, { value: string; onChange: (v: string) => void; onEnter: () => void; placeholder?: string; ariaLabel?: string; id?: string; maxLength?: number }>(
+  function GrowBox({ value, onChange, onEnter, placeholder, ariaLabel, id, maxLength }, ref) {
+    const inner = useRef<HTMLTextAreaElement>(null);
+    useImperativeHandle(ref, () => inner.current as HTMLTextAreaElement);
+    useLayoutEffect(() => {
+      const el = inner.current; if (!el) return;
+      el.style.height = 'auto';
+      el.style.height = `${Math.min(el.scrollHeight + 2, 160)}px`;
+      el.style.overflowY = el.scrollHeight > 158 ? 'auto' : 'hidden';
+    }, [value]);
+    return (
+      <textarea ref={inner} id={id} className="growbox" rows={1} value={value} maxLength={maxLength} placeholder={placeholder} aria-label={ariaLabel ?? placeholder}
+        enterKeyHint="send" onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !(e.nativeEvent as any).isComposing) { e.preventDefault(); onEnter(); } }} />
+    );
+  });
+
 function QuickAdd({ lang, chart, events, onAdd }: { lang: Lang; chart: Chart; events: CalEvent[]; onAdd: (evs: CalEvent[]) => void }) {
   const q = T[lang].qa;
   const t = T[lang];
@@ -952,7 +970,7 @@ function QuickAdd({ lang, chart, events, onAdd }: { lang: Lang; chart: Chart; ev
   const [limitHit, setLimitHit] = useState(false);
   const [drafts, setDrafts] = useState<Draft[] | null>(null);
   const recRef = useRef<any>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   async function send(said = text) {
     if (!said.trim() || busy) return;
@@ -1005,7 +1023,7 @@ function QuickAdd({ lang, chart, events, onAdd }: { lang: Lang; chart: Chart; ev
   return (
     <section className="card quickadd">
       <form className="qa-row" onSubmit={(e) => { e.preventDefault(); send(); }}>
-        <input ref={inputRef} value={text} onChange={(e) => setText(e.target.value)} placeholder={listening ? q.listening : q.ph} aria-label={q.ph} enterKeyHint="send" />
+        <GrowBox ref={inputRef} value={text} onChange={setText} onEnter={() => send()} placeholder={listening ? q.listening : q.ph} ariaLabel={q.ph} />
         <button type="button" className={`qa-mic ${listening ? 'on' : ''}`} onClick={mic} aria-label={q.mic} aria-pressed={listening}>🎤</button>
         <button className="primary qa-go" disabled={busy || !text.trim()}>{busy ? '…' : q.add}</button>
       </form>
@@ -1294,7 +1312,7 @@ function Ask({ lang, chart, events, profile, seed, clearSeed }: { lang: Lang; ch
         {msgs.map((m, i) => (m.text || m.image ? (
           <div key={i} className={`bubble ${m.role}`}>
             {m.image && <img className="shot" src={m.image} alt={t.photoAlt} />}
-            {m.text}
+            {m.text.replace(/\*\*|__/g, '').replace(/^#+\s*/gm, '')}
             {m.upsell && <div style={{ marginTop: 8 }}><button className="primary" onClick={() => bill.upgrade('basic')}>{t.bill.upgrade(t.bill.basic)}</button></div>}
             {m.role === 'assistant' && !m.upsell && !(busy && i === msgs.length - 1) && (
               <div className="basis" aria-label={t.v2.basis}>
@@ -1334,7 +1352,7 @@ function Ask({ lang, chart, events, profile, seed, clearSeed }: { lang: Lang; ch
           </button>
         )}
         <label className="sr" htmlFor="q">{t.askTitle}</label>
-        <input id="q" value={q} onChange={(e) => setQ(e.target.value)} placeholder={listening ? t.listening : photo ? t.photoPlaceholder : t.askPlaceholder} maxLength={500} />
+        <GrowBox id="q" value={q} onChange={setQ} onEnter={() => send(q)} placeholder={listening ? t.listening : photo ? t.photoPlaceholder : t.askPlaceholder} maxLength={500} />
         <button className="primary" disabled={busy || (!q.trim() && !photo)}>{t.send}</button>
       </form>
     </div>

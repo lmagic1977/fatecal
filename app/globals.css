@@ -530,3 +530,10 @@ input:focus-visible, select:focus-visible { outline-color: var(--brand); }
 .fstag.good,.fstag.neutral{background:#d6f0e0;color:#246b3d}.fstag.bad{background:#f8d4cf;color:#a3392a}
 .shell { padding-top: env(safe-area-inset-top); }
 .shell::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: var(--paper); z-index: 60; pointer-events: none; }
+/* auto-growing text boxes (home quick add + ask) */
+textarea.growbox { font: inherit; font-size: 16px; line-height: 1.4; width: 100%; min-height: 44px; max-height: 160px; padding: 11px 14px; border: 1px solid var(--line); border-radius: 22px; background: #fff; color: var(--ink); resize: none; overflow-y: hidden; display: block; }
+.qa-row { align-items: flex-end; }
+.qa-row textarea.growbox { flex: 1; min-width: 0; font-size: 15px; }
+.composer { align-items: flex-end; }
+.composer textarea#q { flex: 1; min-width: 120px; box-shadow: var(--shadow); border: none; }
+textarea.growbox:focus { outline: 2px solid var(--brand-2); outline-offset: 0; border-color: transparent; }
