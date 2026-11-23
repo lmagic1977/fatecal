@@ -45,7 +45,7 @@ interface Seed { q: string; photo?: Pic }
 const birthFsYear = (b: BirthInput) => liChunYear(new Date(b.year, b.month - 1, b.day, b.hourUnknown ? 12 : b.hour, b.hourUnknown ? 0 : b.minute));
 interface Msg { role: 'user' | 'assistant'; text: string; image?: string; upsell?: boolean }
 
-const K = { langPick: 'fatecal.langpick', owner: 'fatecal.owner', profile: 'fatecal.profile', events: 'fatecal.events', ics: 'fatecal.ics', lang: 'fatecal.lang', mailKey: 'fatecal.mailkey', mailAddr: 'fatecal.mailaddr', mail: 'fatecal.mail', mailEdits: 'fatecal.mailedits', gcalKey: 'fatecal.gcalkey', gcal: 'fatecal.gcal', phoneCal: 'fatecal.phonecal', nativeRem: 'fatecal.nativerem' };
+const K = { langPick: 'fatecal.langpick', owner: 'fatecal.owner', profile: 'fatecal.profile', events: 'fatecal.events', ics: 'fatecal.ics', lang: 'fatecal.lang', mailKey: 'fatecal.mailkey', mailAddr: 'fatecal.mailaddr', mail: 'fatecal.mail', mailEdits: 'fatecal.mailedits', gcalKey: 'fatecal.gcalkey', gcal: 'fatecal.gcal', phoneCal: 'fatecal.phonecal', nativeRem: 'fatecal.nativerem', chat: 'fatecal.chat' };
 
 function load<T>(k: string, fallback: T): T {
   try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
@@ -1227,9 +1227,14 @@ async function shrinkImage(file: File): Promise<{ media_type: string; data: stri
 function Ask({ lang, chart, events, profile, seed, clearSeed }: { lang: Lang; chart: Chart; events: CalEvent[]; profile: Profile; seed: Seed | null; clearSeed: () => void }) {
   const t = T[lang];
   const bill = useBill();
-  const [msgs, setMsgs] = useState<Msg[]>([]);
+  // keep the conversation between visits (text only; photos are not stored)
+  const [msgs, setMsgs] = useState<Msg[]>(() => (typeof window === 'undefined' ? [] : load<Msg[]>(K.chat, [])));
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (busy) return;
+    save(K.chat, msgs.filter((m) => m.text).slice(-60).map(({ role, text, upsell }) => ({ role, text, upsell })));
+  }, [msgs, busy]);
   const [photo, setPhoto] = useState<Pic | null>(null);
   const [listening, setListening] = useState(false);
   const [voiceOk, setVoiceOk] = useState(false);
@@ -1315,7 +1320,10 @@ function Ask({ lang, chart, events, profile, seed, clearSeed }: { lang: Lang; ch
   return (
     <div className="stack chat">
       <div>
-        <h1>{t.askTitle}</h1>
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+          <h1>{t.askTitle}</h1>
+          {msgs.length > 0 && !busy && <button className="link small" onClick={() => setMsgs([])}>{L3(lang, 'New chat', '清空对话', 'Nueva conversación')}</button>}
+        </div>
         <p className="muted">{t.askHint}</p>
       </div>
       <div className="msgs">
