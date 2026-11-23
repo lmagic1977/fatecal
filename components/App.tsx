@@ -941,6 +941,15 @@ function relDay(day: Date, lang: Lang): { label: string; word: string } {
   return { label, word };
 }
 
+// iOS keyboard dictation can put the words back after the box is cleared; end it and clear twice
+function clearAfterSend(sent: string, set: (f: (cur: string) => string) => void) {
+  (document.activeElement as HTMLElement | null)?.blur?.();
+  set(() => '');
+  const norm = (x: string) => x.replace(/\s+/g, '');
+  const s0 = norm(sent);
+  for (const ms of [250, 700, 1500]) setTimeout(() => set((cur) => (cur && (s0.includes(norm(cur)) || norm(cur).includes(s0)) ? '' : cur)), ms);
+}
+
 // Text box that grows taller with what you type (width stays the same); Enter sends, Shift+Enter adds a line
 const GrowBox = forwardRef<HTMLTextAreaElement, { value: string; onChange: (v: string) => void; onEnter: () => void; placeholder?: string; ariaLabel?: string; id?: string; maxLength?: number }>(
   function GrowBox({ value, onChange, onEnter, placeholder, ariaLabel, id, maxLength }, ref) {
@@ -974,6 +983,7 @@ function QuickAdd({ lang, chart, events, onAdd }: { lang: Lang; chart: Chart; ev
 
   async function send(said = text) {
     if (!said.trim() || busy) return;
+    (document.activeElement as HTMLElement | null)?.blur?.(); // ends keyboard dictation
     setBusy(true); setMsg(''); setLimitHit(false);
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const r = await fetch('/api/parse', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: said, tz, lang }) }).catch(() => null);
@@ -1064,7 +1074,7 @@ function QuickAdd({ lang, chart, events, onAdd }: { lang: Lang; chart: Chart; ev
             <div className="row gap">
               <button className="primary grow" onClick={() => {
                 onAdd(drafts.map(({ assumed, orig, ...e }) => ({ ...e, id: `m${Date.now()}${Math.random().toString(36).slice(2, 6)}` })));
-                setMsg(q.saved(drafts.length)); setDrafts(null); setText('');
+                setMsg(q.saved(drafts.length)); setDrafts(null); clearAfterSend(text, setText);
               }}>{q.saveAll(drafts.length)}</button>
               <button type="button" className="ghost" onClick={() => setDrafts(null)}>{t.cancel}</button>
             </div>
@@ -1258,7 +1268,7 @@ function Ask({ lang, chart, events, profile, seed, clearSeed }: { lang: Lang; ch
     if ((!question.trim() && !pic) || busy) return;
     const history = msgs;
     setMsgs([...history, { role: 'user', text: question || L3(lang, 'What about this photo?', '帮我看看这张图', '¿Qué opinas de esta foto?'), image: pic?.preview }, { role: 'assistant', text: '' }]);
-    setQ('');
+    clearAfterSend(question, setQ);
     setPhoto(null);
     setBusy(true);
     const put = (text: string) => setMsgs((m) => [...m.slice(0, -1), { role: 'assistant', text }]);
