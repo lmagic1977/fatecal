@@ -1279,7 +1279,7 @@ function Ask({ lang, chart, events, profile, seed, clearSeed }: { lang: Lang; ch
       const res = await fetch('/api/ask', {
         method: 'POST', headers: { 'content-type': 'application/json' }, signal: ctrl.signal,
         body: JSON.stringify({
-          question, lang, history: history.map(({ role, text }) => ({ role, text })),
+          question, lang, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, history: history.map(({ role, text }) => ({ role, text })),
           context: buildContext(chart, events, question, lang, { birthYear: birthFsYear(profile.birth), sex: profile.sex }),
           image: pic ? { media_type: pic.media_type, data: pic.data } : undefined,
         }),

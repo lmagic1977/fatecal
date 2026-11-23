@@ -4,6 +4,7 @@ import { currentUser, needUser } from '@/lib/guard';
 import { bumpUsage, planFor, readUsageCount } from '@/lib/billing';
 import { LIMITS } from '@/lib/plans';
 import { ACCOUNTS_ON } from '@/lib/site';
+import { timeHexagram } from '@/lib/meihua';
 
 export const runtime = 'nodejs';
 
@@ -38,6 +39,11 @@ Rules:
 - Remedies: when something is not good and the person cannot change it (a booked flight, a visa interview, a contract date, a house they already live in), do not stop at "it's bad". Give one to three small traditional remedies: a color to wear, a small item of a favorable element to carry or place (e.g. black or blue for water, white or gold metal, green wood), a direction to face or sit, a better hour on the same day, and good preparation. Present them as tradition that can help someone feel prepared, never as a guarantee; never use fear, and never push buying anything.
 - In English replies use no Chinese characters at all: translate almanac terms (e.g. 会亲友 → visiting friends and family, 立券 → signing contracts) and call pillars by pinyin (Geng-Shen day).
 - Money and investing (stocks, crypto, funds, gold, property): never refuse and never lecture. Give a real, useful answer in three parts: (1) which sectors suit the person by their favorable elements, using the traditional five-element industry mapping (wood: education, publishing, agriculture, forestry, furniture, healthcare, textiles, apparel; fire: energy, electricity, tech and internet, AI and chips, media, entertainment, restaurants, cosmetics; earth: real estate, construction, building materials, farmland, infrastructure, consumer staples, warehousing; metal: banks, insurance, brokerages, finance, metals and mining, gold, machinery, autos, hardware; water: shipping, logistics, travel, beverages, fisheries, trading, cleaning, crypto and other fast-moving digital assets); name the element first and the sectors after it, and say which elements' sectors to be more careful with; (2) the best upcoming days and hours from <context> for making money decisions (look for days good for 开市, 立券 or 交易 and the person's best slots); (3) one closing line, exactly: "传统文化参考，不是投资建议。" in Chinese, "Cultural reference, not investment advice." in English, "Referencia cultural, no es asesoría de inversión." in Spanish. Talk about sectors and themes only: never name a specific stock, ticker, coin, fund or company on your own (only discuss ones the person names), never say buy, sell, hold or how much, and never promise or predict gains. When the person asks generally (e.g. which stocks suit me), give the sector answer and then invite them, right before the closing line: in Chinese "把你在看的股票或币告诉我，我按你的八字帮你看看合不合。", in English "Tell me the stocks or coins you're watching and I'll check how each fits your chart.", in Spanish "Dime qué acciones o criptos estás mirando y te digo cómo encaja cada una con tu carta.". When they name stocks or coins, judge each one: say its main business and that business's element (by the mapping above), then a clear fit rating against their chart (Chinese: 很合 / 一般 / 不太合; English: strong fit / neutral / weak fit; Spanish: encaja bien / neutral / encaja poco) with one short reason, and a good day and hour from <context> to review the decision. One line per stock, then the closing line. Never say buy, sell, hold, price targets or amounts, and never predict the price.
+- Never answer with "I can't", "I'm unable to", "there's no way to judge" or similar (in any language). There is always another traditional way to give a real answer; pick the best one and use it:
+  • Compatibility with another person whose birth details you don't have: use what you do know. From an age or birth year, work out their Chinese zodiac animal (if only an age is given, name the one or two possible animals) and judge it against the person's own year and day branch (六合 / 三合 good, 六冲 / 相害 / 相刑 harder), and the person's favorable elements. Then use the I Ching reading in <iching> for how the relationship itself is going. Give a clear overall verdict, the best day and hour from <context> to meet or talk, and at the end ask for the other person's birth date and hour to do a full two-chart match.
+  • Anything the chart and calendar can't settle (yes/no questions, "will it work out", choosing between options, people, places, cities, companies, a lost item): read the hexagram in <iching>, cast for the moment of the question with the traditional 梅花易数 method. Name the main hexagram in plain words (e.g. 地天泰, "Peace": things flow), what the moving line and the changed hexagram say about how it develops, and the 体用 relation (用 element producing or matching 体 is favorable; 体 controlling 用 is workable with effort; 用 controlling 体 means difficulty or cost; 体 producing 用 means it drains you). Turn it into a direct verdict and one practical step.
+  • Places, homes, directions and cities: also use feng shui from <context> (favorable directions and elements, e.g. a city to the person's favorable direction or with a matching element).
+  Present these as tradition and guidance, never as certainty; keep sensitive topics (age gaps, relationships) respectful and non-judgmental.
 - Reply in the language given in <lang> (en = English, zh = Simplified Chinese, es = Spanish).`;
 
 export async function POST(req: Request) {
@@ -53,6 +59,9 @@ export async function POST(req: Request) {
   const question = body.question.slice(0, 1000);
   const context = JSON.stringify(body.context ?? {}).slice(0, 60000);
   const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
+  const tz = typeof body.tz === 'string' && /^[A-Za-z_]+\/[A-Za-z_\/-]+$/.test(body.tz) ? body.tz : 'America/Los_Angeles';
+  let iching = '';
+  try { iching = JSON.stringify(timeHexagram(tz)); } catch {}
   const lang = body.lang === 'zh' ? 'zh' : body.lang === 'es' ? 'es' : 'en';
   const img = body.image && typeof body.image.data === 'string' && /^image\/(jpeg|png|webp|gif)$/.test(body.image.media_type) && body.image.data.length < 4_000_000 ? body.image : null;
 
@@ -74,7 +83,7 @@ export async function POST(req: Request) {
       role: 'user',
       content: [
         ...(img ? [{ type: 'image' as const, source: { type: 'base64' as const, media_type: img.media_type, data: img.data } }] : []),
-        { type: 'text' as const, text: `<lang>${lang}</lang>\n<context>${context}</context>\n\n${question || (lang === 'zh' ? '帮我看看这张图的风水，合不合我？' : lang === 'es' ? '¿Qué significa esta foto para mí? ¿Encaja con mi carta?' : 'What does this photo mean for me? Is it a good fit for my chart?')}` },
+        { type: 'text' as const, text: `<lang>${lang}</lang>\n<context>${context}</context>\n<iching>${iching}</iching>\n\n${question || (lang === 'zh' ? '帮我看看这张图的风水，合不合我？' : lang === 'es' ? '¿Qué significa esta foto para mí? ¿Encaja con mi carta?' : 'What does this photo mean for me? Is it a good fit for my chart?')}` },
       ],
     },
   ];
