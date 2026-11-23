@@ -952,6 +952,7 @@ function QuickAdd({ lang, chart, events, onAdd }: { lang: Lang; chart: Chart; ev
   const [limitHit, setLimitHit] = useState(false);
   const [drafts, setDrafts] = useState<Draft[] | null>(null);
   const recRef = useRef<any>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   async function send(said = text) {
     if (!said.trim() || busy) return;
@@ -968,7 +969,8 @@ function QuickAdd({ lang, chart, events, onAdd }: { lang: Lang; chart: Chart; ev
 
   function mic() {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { setMsg(q.micNo); return; }
+    // In the phone app the web speech API doesn't work: open the keyboard so its own 🎤 dictation can be used
+    if (!SR || isNativeApp()) { inputRef.current?.focus(); setMsg(isNativeApp() ? q.micApp : q.micNo); return; }
     if (listening) { recRef.current?.stop(); return; }
     const rec = new SR();
     rec.lang = tLocale(lang);
@@ -994,7 +996,7 @@ function QuickAdd({ lang, chart, events, onAdd }: { lang: Lang; chart: Chart; ev
   return (
     <section className="card quickadd">
       <form className="qa-row" onSubmit={(e) => { e.preventDefault(); send(); }}>
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder={listening ? q.listening : q.ph} aria-label={q.ph} enterKeyHint="send" />
+        <input ref={inputRef} value={text} onChange={(e) => setText(e.target.value)} placeholder={listening ? q.listening : q.ph} aria-label={q.ph} enterKeyHint="send" />
         <button type="button" className={`qa-mic ${listening ? 'on' : ''}`} onClick={mic} aria-label={q.mic} aria-pressed={listening}>🎤</button>
         <button className="primary qa-go" disabled={busy || !text.trim()}>{busy ? '…' : q.add}</button>
       </form>

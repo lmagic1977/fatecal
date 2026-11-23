@@ -52,7 +52,7 @@ export const T = {
     },
     qa: {
       ph: 'Say it: "doctor tomorrow 3pm"',
-      add: 'Add', listening: 'Listening…', mic: 'Speak', micNo: 'Voice input isn\'t available in this browser. Tap the box and use your keyboard\'s 🎤.',
+      add: 'Add', listening: 'Listening…', mic: 'Speak', micApp: 'Tap the 🎤 on your keyboard and say it, then tap Add.', micNo: 'Voice input isn\'t available in this browser. Tap the box and use your keyboard\'s 🎤.',
       thinking: 'Reading…', found: (n: number) => (n === 1 ? 'Add this?' : `Add these ${n}?`), save: 'Save', saveAll: (n: number) => (n === 1 ? 'Save' : `Save all ${n}`),
       none: 'I couldn\'t find a date or event in that. Try "dinner with Amy Friday 7pm".', failed: 'Something went wrong. Try again.',
       limit: (n: number) => `You've used today's ${n} quick adds. Upgrade for more, or use + Add event.`,
@@ -298,7 +298,7 @@ export const T = {
     },
     qa: {
       ph: '说一句：明天下午3点看医生',
-      add: '添加', listening: '正在听…', mic: '语音', micNo: '这个浏览器不支持语音输入。点输入框，用键盘上的 🎤 说就行。',
+      add: '添加', listening: '正在听…', mic: '语音', micApp: '点键盘上的 🎤 说出来，说完点「添加」。', micNo: '这个浏览器不支持语音输入。点输入框，用键盘上的 🎤 说就行。',
       thinking: '正在识别…', found: (n: number) => (n === 1 ? '添加这件事？' : `添加这 ${n} 件事？`), save: '保存', saveAll: (n: number) => (n === 1 ? '保存' : `全部保存（${n}）`),
       none: '没听出日期或事情。试试“周五晚上7点和小王吃饭”。', failed: '出了点问题，请再试一次。',
       limit: (n: number) => `今天的 ${n} 次一句话添加已用完。升级可以用更多，也可以用「+ 添加日程」手动加。`,
@@ -544,7 +544,7 @@ export const T = {
     },
     qa: {
       ph: 'Dilo: «médico mañana a las 3pm»',
-      add: 'Agregar', listening: 'Escuchando…', mic: 'Hablar', micNo: 'Este navegador no admite entrada de voz. Toca el cuadro y usa el 🎤 del teclado.',
+      add: 'Agregar', listening: 'Escuchando…', mic: 'Hablar', micApp: 'Toca el 🎤 del teclado y dilo; luego toca Agregar.', micNo: 'Este navegador no admite entrada de voz. Toca el cuadro y usa el 🎤 del teclado.',
       thinking: 'Leyendo…', found: (n: number) => (n === 1 ? '¿Agregar esto?' : `¿Agregar estos ${n}?`), save: 'Guardar', saveAll: (n: number) => (n === 1 ? 'Guardar' : `Guardar los ${n}`),
       none: 'No encontré una fecha o evento. Prueba «cena con Ana el viernes a las 7pm».', failed: 'Algo salió mal. Inténtalo de nuevo.',
       limit: (n: number) => `Ya usaste tus ${n} entradas rápidas de hoy. Mejora tu plan para más, o usa + Agregar evento.`,
