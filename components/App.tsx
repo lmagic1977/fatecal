@@ -12,6 +12,7 @@ import ShoppingResources from '@/components/ShoppingResources';
 import { CONTACT_EMAIL, ACCOUNTS_ON, SHOPPING_ON } from '@/lib/site';
 import type { MailItem } from '@/lib/mail';
 import { expandRepeats, dateKey } from '@/lib/recur';
+import { isNativeApp, isIosApp, phoneCalendarAllowed, phoneCalendarEvents, notificationsAllowed, setReminders, hashId, type Reminder } from '@/lib/native';
 import { LIMITS, PRICES, TRIAL_DAYS, money, type Interval, type Limits, type Plan } from '@/lib/plans';
 import { trackMeta, trackMetaOnce, markRegistrationPending, consumeRegistrationPending } from '@/lib/meta';
 
@@ -30,7 +31,7 @@ function Locked({ lang, text }: { lang: Lang; text: string }) {
   return (
     <div className="locked">
       <span>🔒 {text}</span>
-      <button className="link" onClick={() => upgrade('basic')}>{b.upgrade(b.basic)} →</button>
+      {!isIosApp() && <button className="link" onClick={() => upgrade('basic')}>{b.upgrade(b.basic)} →</button>}
     </div>
   );
 }
@@ -44,7 +45,7 @@ interface Seed { q: string; photo?: Pic }
 const birthFsYear = (b: BirthInput) => liChunYear(new Date(b.year, b.month - 1, b.day, b.hourUnknown ? 12 : b.hour, b.hourUnknown ? 0 : b.minute));
 interface Msg { role: 'user' | 'assistant'; text: string; image?: string; upsell?: boolean }
 
-const K = { langPick: 'fatecal.langpick', owner: 'fatecal.owner', profile: 'fatecal.profile', events: 'fatecal.events', ics: 'fatecal.ics', lang: 'fatecal.lang', mailKey: 'fatecal.mailkey', mailAddr: 'fatecal.mailaddr', mail: 'fatecal.mail', mailEdits: 'fatecal.mailedits', gcalKey: 'fatecal.gcalkey', gcal: 'fatecal.gcal' };
+const K = { langPick: 'fatecal.langpick', owner: 'fatecal.owner', profile: 'fatecal.profile', events: 'fatecal.events', ics: 'fatecal.ics', lang: 'fatecal.lang', mailKey: 'fatecal.mailkey', mailAddr: 'fatecal.mailaddr', mail: 'fatecal.mail', mailEdits: 'fatecal.mailedits', gcalKey: 'fatecal.gcalkey', gcal: 'fatecal.gcal', phoneCal: 'fatecal.phonecal', nativeRem: 'fatecal.nativerem' };
 
 function load<T>(k: string, fallback: T): T {
   try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
@@ -97,6 +98,11 @@ export default function App({ initialLang = "en", pathLang }: { initialLang?: La
   // Google Calendar (read-only): the browser's key, and the last events we read
   const [gcalKey, setGcalKey] = useState<string | null>(null);
   const [gcal, setGcal] = useState<GcalState | null>(null);
+  // In the FateCal phone app: the phone's own calendar and local reminders
+  const [native, setNative] = useState(false);
+  const [phoneOn, setPhoneOn] = useState(false);
+  const [phoneEvents, setPhoneEvents] = useState<CalEvent[]>([]);
+  const [rem, setRem] = useState<NativeRem>({ on: false, before: 30, morning: true });
   const [bill, setBill] = useState<BillInfo>(FREE_INFO);
   const [billNote, setBillNote] = useState('');
   const [mailUsage, setMailUsage] = useState<{ used: number; limit: number } | null>(null);
@@ -292,7 +298,49 @@ export default function App({ initialLang = "en", pathLang }: { initialLang?: La
     const now = new Date();
     return expandRepeats(manual, new Date(now.getFullYear(), now.getMonth() - 3, 1), new Date(now.getFullYear() + 1, now.getMonth() + 1, 1));
   }, [manual]);
-  const events = useMemo(() => [...manualExpanded, ...(ics?.events ?? []), ...(gcal?.events ?? []), ...mailEvents].sort((a, b) => a.start.localeCompare(b.start)), [manualExpanded, ics, gcal, mailEvents]);
+  const events = useMemo(() => [...manualExpanded, ...(ics?.events ?? []), ...(gcal?.events ?? []), ...(phoneOn ? phoneEvents : []), ...mailEvents].sort((a, b) => a.start.localeCompare(b.start)), [manualExpanded, ics, gcal, mailEvents, phoneOn, phoneEvents]);
+  useEffect(() => {
+    if (!ready) return;
+    setNative(isNativeApp());
+    setPhoneOn(load<boolean>(K.phoneCal, false));
+    setRem(load<NativeRem>(K.nativeRem, { on: false, before: 30, morning: true }));
+  }, [ready]);
+  // phone calendar: read on start and whenever the app comes back to the front
+  useEffect(() => {
+    if (!native || !phoneOn) return;
+    const pull = async () => { if (await phoneCalendarAllowed(false)) setPhoneEvents(await phoneCalendarEvents().catch(() => [])); };
+    pull();
+    const vis = () => { if (document.visibilityState === 'visible') pull(); };
+    document.addEventListener('visibilitychange', vis);
+    return () => document.removeEventListener('visibilitychange', vis);
+  }, [native, phoneOn]);
+  // local reminders: rebuilt whenever plans change (next 7 days), plus a morning reading
+  useEffect(() => {
+    if (!native) return;
+    if (!rem.on || !chart) { setReminders([]); return; }
+    const id = setTimeout(() => {
+      const now = Date.now(), until = now + 7 * 86400000, list: Reminder[] = [];
+      const t2 = T[lang];
+      if (rem.before > 0) for (const e of events) {
+        if (e.allDay) continue;
+        const s = new Date(e.start).getTime();
+        if (s < now || s > until) continue;
+        const r = readEvent(chart, e, events);
+        const alt = r.alternatives[0];
+        let body = `${fmtTime(e.start, lang)} · ${r.score} ${t2[r.verdict]}`;
+        if (r.verdict !== 'good' && alt && sameDay(new Date(alt.start), new Date(e.start))) body += ` · ${t2.qa.useBetter(fmtTime(alt.start, lang), alt.score)}`;
+        list.push({ id: hashId(`${e.id}@${e.start}`), title: L3(lang, `In ${rem.before} min: ${e.title}`, `${rem.before} 分钟后：${e.title}`, `En ${rem.before} min: ${e.title}`), body, at: new Date(s - rem.before * 60000) });
+      }
+      if (rem.morning) for (let i = 0; i < 7; i++) {
+        const d = new Date(); d.setDate(d.getDate() + i); d.setHours(8, 0, 0, 0);
+        const sc = scoreDay(chart, d), best = sc.bestHours[0];
+        list.push({ id: hashId(`am:${dateKey(d)}`), title: L3(lang, `Today: ${sc.score} · ${t2[sc.verdict]}`, `今天 ${sc.score} 分 · ${t2[sc.verdict]}`, `Hoy: ${sc.score} · ${t2[sc.verdict]}`),
+          body: `${t2.verdictLine[sc.verdict].replace('{w}', L3(lang, 'Today', '今天', 'Hoy'))}${best ? ` ${t2.v2.window(fmtHour(best.start, lang), fmtHour(best.start + 2, lang), L3(lang, 'today', '今天', 'hoy'))}` : ''}`, at: d });
+      }
+      setReminders(list);
+    }, 1500);
+    return () => clearTimeout(id);
+  }, [native, rem, events, chart, lang]);
   // move or remove any event the user owns in FateCal: ones they added, and ones that came from email
   const moveEvent = (e: CalEvent, start: string, end: string) => {
     // one occurrence of a repeating series: skip that date in the series and add a one-off at the new time
@@ -349,6 +397,7 @@ export default function App({ initialLang = "en", pathLang }: { initialLang?: La
         {tab === 'chart' && <ChartView lang={lang} chart={chart} profile={profile} onEdit={(p) => { setProfile(p); save(K.profile, p); }} />}
         {tab === 'settings' && (
           <Settings lang={lang} setLang={setLang} ics={ics} setIcs={setIcs} billNote={billNote}
+            nativeApp={native ? { phoneOn, phoneCount: phoneEvents.length, setPhoneOn: (v: boolean) => { setPhoneOn(v); save(K.phoneCal, v); if (!v) setPhoneEvents([]); }, rem, setRem: (r: NativeRem) => { setRem(r); save(K.nativeRem, r); } } : null}
             gcal={gcal} gcalNote={gcalNote}
             onGcalConnect={() => { let k = gcalKey; if (!k) { k = crypto.randomUUID(); save(K.gcalKey, k); setGcalKey(k); } location.href = `/api/gcal/start?key=${encodeURIComponent(k)}`; }}
             onGcalRefresh={() => refreshGcal()}
@@ -583,7 +632,7 @@ function SignUp({ lang, providers }: { lang: Lang; providers: string[] }) {
   const [typo, setTypo] = useState<string | null>(null);
   const [typoAsked, setTypoAsked] = useState(false);
   const to = mode === 'email' ? email.trim() : `${dial}${num.replace(/[^\d]/g, '').replace(/^0+/, '')}`;
-  const social = providers.filter((p) => p === 'google' || p === 'facebook');
+  const social = isNativeApp() ? [] : providers.filter((p) => p === 'google' || p === 'facebook');
 
   async function send() {
     setErr('');
@@ -1597,7 +1646,7 @@ function ChartView({ lang, chart, profile, onEdit }: { lang: Lang; chart: Chart;
 
 // ---------------- settings ----------------
 
-function Settings({ lang, setLang, ics, setIcs, billNote, gcal, gcalNote, onGcalConnect, onGcalRefresh, onGcalDisconnect, onReset, chart, mail, mailAddr, mailUsage, onEnableMail, onCheckMail, onClearMail, account, providers }: { billNote: string; gcal: GcalState | null; gcalNote: string; onGcalConnect: () => void; onGcalRefresh: () => Promise<boolean>; onGcalDisconnect: () => Promise<void>; account: Account | null; providers: string[]; lang: Lang; setLang: (l: Lang) => void; ics: { url: string; events: CalEvent[]; at?: string } | null; setIcs: (v: { url: string; events: CalEvent[]; at?: string } | null) => void; onReset: () => void; chart: Chart; mail: MailItem[]; mailAddr: string | null; mailUsage: { used: number; limit: number } | null; onEnableMail: () => Promise<void>; onCheckMail: () => Promise<number>; onClearMail: () => void }) {
+function Settings({ nativeApp, lang, setLang, ics, setIcs, billNote, gcal, gcalNote, onGcalConnect, onGcalRefresh, onGcalDisconnect, onReset, chart, mail, mailAddr, mailUsage, onEnableMail, onCheckMail, onClearMail, account, providers }: { billNote: string; gcal: GcalState | null; gcalNote: string; onGcalConnect: () => void; onGcalRefresh: () => Promise<boolean>; onGcalDisconnect: () => Promise<void>; account: Account | null; providers: string[]; nativeApp: NativeProps | null; lang: Lang; setLang: (l: Lang) => void; ics: { url: string; events: CalEvent[]; at?: string } | null; setIcs: (v: { url: string; events: CalEvent[]; at?: string } | null) => void; onReset: () => void; chart: Chart; mail: MailItem[]; mailAddr: string | null; mailUsage: { used: number; limit: number } | null; onEnableMail: () => Promise<void>; onCheckMail: () => Promise<number>; onClearMail: () => void }) {
   const t = T[lang];
   const [url, setUrl] = useState(ics?.url ?? '');
   const [state, setState] = useState<'idle' | 'busy' | 'error'>('idle');
@@ -1622,7 +1671,7 @@ function Settings({ lang, setLang, ics, setIcs, billNote, gcal, gcalNote, onGcal
         </div>
       </section>
       {ACCOUNTS_ON && <InviteCard lang={lang} />}
-      {ACCOUNTS_ON && <ReminderCard lang={lang} />}
+      {nativeApp ? <NativeCards lang={lang} n={nativeApp} /> : ACCOUNTS_ON && <ReminderCard lang={lang} />}
       {ACCOUNTS_ON && <WhatsAppCard lang={lang} />}
       <section className="card form">
         <div className="label">{t.calendar}</div>
@@ -1705,7 +1754,8 @@ function PlanCard({ lang, note }: { lang: Lang; note: string }) {
           {info.hasCustomer && <button className="ghost" onClick={manage}>{b.manage}</button>}
         </>
       )}
-      {info.plan === 'free' && (
+      {info.plan === 'free' && isIosApp() && <p className="small muted">{b.iosNote}</p>}
+      {info.plan === 'free' && !isIosApp() && (
         <>
           <div className="seg sm">
             <button className={iv === 'month' ? 'on' : ''} onClick={() => setIv('month')}>{b.monthly}</button>
@@ -1729,7 +1779,7 @@ function PlanCard({ lang, note }: { lang: Lang; note: string }) {
           <p className="tiny">{b.trialNote} {b.cancelNote}</p>
         </>
       )}
-      {!info.grantUntil && (
+      {!info.grantUntil && !isIosApp() && (
         <form className="row gap" onSubmit={(e) => { e.preventDefault(); redeemCode(); }}>
           <input className="grow" value={code} onChange={(e) => setCode(e.target.value)} placeholder={b.haveCode} aria-label={b.haveCode} autoCapitalize="characters" />
           <button className="ghost" disabled={busy || !code.trim()}>{b.redeem}</button>
@@ -1767,6 +1817,56 @@ function InviteCard({ lang }: { lang: Lang }) {
 
 // ---------------- reminders (web push) ----------------
 const b64key = (k: string) => { const p = '='.repeat((4 - (k.length % 4)) % 4); const r = atob((k + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(r, (c) => c.charCodeAt(0)); };
+
+interface NativeRem { on: boolean; before: number; morning: boolean }
+interface NativeProps { phoneOn: boolean; phoneCount: number; setPhoneOn: (v: boolean) => void; rem: NativeRem; setRem: (r: NativeRem) => void }
+
+// Only inside the FateCal app: read the phone's calendar, and reminders that need no server
+function NativeCards({ lang, n }: { lang: Lang; n: NativeProps }) {
+  const p = T[lang].pc, r = T[lang].rm;
+  const [msg, setMsg] = useState('');
+  return (
+    <>
+      <section className="card stack">
+        <div className="label">📱 {p.title}</div>
+        {n.phoneOn ? (
+          <>
+            <p className="small"><b>{p.on(n.phoneCount)}</b></p>
+            <button className="link danger" onClick={() => n.setPhoneOn(false)}>{p.off}</button>
+          </>
+        ) : (
+          <>
+            <p className="small muted">{p.pitch}</p>
+            <button className="primary" onClick={async () => { setMsg(''); if (await phoneCalendarAllowed(true)) n.setPhoneOn(true); else setMsg(p.denied); }}>{p.connect}</button>
+          </>
+        )}
+        <p className="tiny">{p.privacy}</p>
+      </section>
+      <section className="card stack">
+        <div className="label">🔔 {r.title}</div>
+        {n.rem.on ? (
+          <>
+            <p className="small"><b>{r.onHere}</b></p>
+            <label className="small">{r.before}
+              <select value={n.rem.before} onChange={(e) => n.setRem({ ...n.rem, before: Number(e.target.value) })}>
+                {[10, 15, 30, 60, 120].map((x) => <option key={x} value={x}>{r.mins(x)}</option>)}
+                <option value={0}>{r.none}</option>
+              </select>
+            </label>
+            <label className="row gap small" style={{ alignItems: 'center' }}><input type="checkbox" checked={n.rem.morning} onChange={(e) => n.setRem({ ...n.rem, morning: e.target.checked })} /> {r.morning} · 8:00</label>
+            <button className="link danger" onClick={() => n.setRem({ ...n.rem, on: false })}>{r.off}</button>
+          </>
+        ) : (
+          <>
+            <p className="small muted">{r.pitch}</p>
+            <button className="primary" onClick={async () => { setMsg(''); if (await notificationsAllowed(true)) n.setRem({ ...n.rem, on: true }); else setMsg(r.denied); }}>🔔 {r.on}</button>
+          </>
+        )}
+      </section>
+      {msg && <p className="small danger" role="alert">{msg}</p>}
+    </>
+  );
+}
 
 function ReminderCard({ lang }: { lang: Lang }) {
   const r = T[lang].rm;

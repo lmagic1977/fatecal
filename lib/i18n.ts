@@ -29,6 +29,11 @@ export const T = {
       rules: (max: number) => `Counts once your friend finishes their birth details. New accounts only. Up to ${max} months.`,
       banner: '🎁 A friend invited you: sign up and add your birth details, and you both get a month of Basic free.',
     },
+    pc: {
+      title: 'Phone calendar', pitch: 'Let FateCal read the calendar on this phone (iCloud, Google, Outlook, whatever it shows) and score every plan. Read only: FateCal never changes it.',
+      connect: 'Use my phone calendar', off: 'Stop reading the phone calendar', on: (n: number) => `Reading your phone calendar ✓ ${n} event${n === 1 ? '' : 's'} in the next 60 days`,
+      denied: 'Calendar access is off. Turn it on for FateCal in your phone\'s Settings, then try again.', privacy: 'Phone calendar events stay on this phone; they are not uploaded to our servers.',
+    },
     rm: {
       title: 'Reminders', pitch: 'Get a nudge before each event, with its score, and a short reading every morning.',
       on: 'Turn on reminders', onHere: 'Reminders are on for this device ✓', off: 'Turn off on this device', test: 'Send a test',
@@ -58,6 +63,7 @@ export const T = {
     },
     bill: {
       current: (p: string, alt: string) => `Current price: ${p}. You can switch to ${alt} in Manage subscription.`,
+      iosNote: 'Plans can\'t be bought inside the app yet. Gift time from invites still applies.',
       plan: 'Your plan', free: 'Free', basic: 'Basic', premium: 'Premium',
       perMonth: '/month', perYear: '/year', monthly: 'Monthly', yearly: 'Yearly', save: 'save 33%',
       trial: (d: number) => `${d}-day free trial`, trialNote: 'You will not be charged during the trial. We email you before it ends; cancel any time in one tap.',
@@ -269,6 +275,11 @@ export const T = {
       rules: (max: number) => `朋友填好生日资料后才算数；仅限新注册用户；最多累计 ${max} 个月。`,
       banner: '🎁 朋友邀请你：注册并填好生日资料，你们俩各得 1 个月基础版。',
     },
+    pc: {
+      title: '手机日历', pitch: '让随身吉历读取这台手机上的日历（iCloud、Google、Outlook，手机里显示的都算），给每件事打分。只读，不会改动你的日历。',
+      connect: '读取手机日历', off: '不再读取手机日历', on: (n: number) => `已读取手机日历 ✓ 未来 60 天共 ${n} 个日程`,
+      denied: '日历权限没打开。请到手机「设置」里允许随身吉历访问日历，再试一次。', privacy: '手机日历里的日程只在这台手机上使用，不会上传到我们的服务器。',
+    },
     rm: {
       title: '提醒', pitch: '每个日程开始前提醒你，并附上评分；每天早上再发一条简短的运势。',
       on: '开启提醒', onHere: '这台设备已开启提醒 ✓', off: '在这台设备上关闭', test: '发一条测试',
@@ -298,6 +309,7 @@ export const T = {
     },
     bill: {
       current: (p: string, alt: string) => `当前价格：${p}。可在「管理订阅」里改成${alt}。`,
+      iosNote: '暂不支持在 App 内购买会员；邀请好友送的会员时间照常有效。',
       plan: '你的会员', free: '免费版', basic: '基础版', premium: '高级版',
       perMonth: '/月', perYear: '/年', monthly: '按月', yearly: '按年', save: '省 33%',
       trial: (d: number) => `免费试用 ${d} 天`, trialNote: '试用期内不扣钱。到期前会发邮件提醒你，随时一键退订。',
@@ -509,6 +521,11 @@ export const T = {
       rules: (max: number) => `Cuenta cuando tu amigo completa sus datos de nacimiento. Solo cuentas nuevas. Hasta ${max} meses.`,
       banner: '🎁 Un amigo te invitó: regístrate y agrega tus datos de nacimiento, y ambos reciben un mes de Básico gratis.',
     },
+    pc: {
+      title: 'Calendario del teléfono', pitch: 'Deja que FateCal lea el calendario de este teléfono (iCloud, Google, Outlook, lo que muestre) y puntúe cada plan. Solo lectura: FateCal nunca lo cambia.',
+      connect: 'Usar el calendario del teléfono', off: 'Dejar de leer el calendario', on: (n: number) => `Leyendo tu calendario ✓ ${n} evento${n === 1 ? '' : 's'} en los próximos 60 días`,
+      denied: 'El acceso al calendario está desactivado. Actívalo para FateCal en los Ajustes del teléfono e inténtalo de nuevo.', privacy: 'Los eventos del calendario del teléfono se quedan en este teléfono; no se suben a nuestros servidores.',
+    },
     rm: {
       title: 'Recordatorios', pitch: 'Recibe un aviso antes de cada evento, con su puntuación, y una lectura breve cada mañana.',
       on: 'Activar recordatorios', onHere: 'Recordatorios activados en este dispositivo ✓', off: 'Desactivar en este dispositivo', test: 'Enviar una prueba',
@@ -538,6 +555,7 @@ export const T = {
     },
     bill: {
       current: (p: string, alt: string) => `Precio actual: ${p}. Puedes cambiar a ${alt} en Gestionar suscripción.`,
+      iosNote: 'Aún no se pueden comprar planes dentro de la app. El tiempo regalado por invitaciones sigue valiendo.',
       plan: 'Tu plan', free: 'Gratis', basic: 'Básico', premium: 'Premium',
       perMonth: '/mes', perYear: '/año', monthly: 'Mensual', yearly: 'Anual', save: 'ahorra 33%',
       trial: (d: number) => `Prueba gratis de ${d} días`, trialNote: 'No se te cobra durante la prueba. Te avisamos por correo antes de que termine; cancela cuando quieras con un toque.',
