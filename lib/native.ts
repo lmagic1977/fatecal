@@ -56,3 +56,35 @@ export async function setReminders(list: Reminder[]) {
   } catch { /* ignore */ }
 }
 export const hashId = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h) % 2000000000; };
+
+// ---- voice input (phone app only; needs the SpeechRecognition plugin in the installed build) ----
+export const nativeSpeechReady = () => isNativeApp() && !!plugin('SpeechRecognition');
+let speechSubs: any[] = [];
+let silence: ReturnType<typeof setTimeout> | undefined;
+export async function stopNativeSpeech() {
+  clearTimeout(silence);
+  try { await plugin('SpeechRecognition')?.stop(); } catch {}
+}
+/** Listen once. onText gets the running transcript; onEnd gets the final text ('' if nothing / denied). */
+export async function startNativeSpeech(locale: string, onText: (s: string) => void, onEnd: (s: string, denied?: boolean) => void) {
+  const S = plugin('SpeechRecognition');
+  if (!S) return onEnd('');
+  try {
+    const p = await S.requestPermissions();
+    if (p?.speechRecognition !== 'granted') return onEnd('', true);
+  } catch { return onEnd('', true); }
+  for (const s of speechSubs) try { await s.remove(); } catch {}
+  speechSubs = [];
+  let text = '', done = false;
+  const finish = () => { if (done) return; done = true; clearTimeout(silence); for (const s of speechSubs) try { s.remove(); } catch {} speechSubs = []; onEnd(text.trim()); };
+  const arm = () => { clearTimeout(silence); silence = setTimeout(() => { S.stop().catch(() => {}); finish(); }, 1800); };
+  speechSubs.push(await S.addListener('partialResults', (e: any) => {
+    const cur = e?.accumulatedText ?? `${e?.accumulated ?? ''}${e?.matches?.[0] ?? ''}`;
+    if (cur) { text = cur; onText(cur); arm(); }
+  }));
+  speechSubs.push(await S.addListener('listeningState', (e: any) => { if ((e?.state ?? e?.status) === 'stopped') finish(); }));
+  try {
+    await S.start({ language: locale, partialResults: true, popup: false, addPunctuation: false });
+    silence = setTimeout(() => { S.stop().catch(() => {}); finish(); }, 8000); // nothing said at all
+  } catch { finish(); }
+}

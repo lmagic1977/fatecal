@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>FateCal uses the microphone so you can add a plan by saying it.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>FateCal turns what you say into a calendar plan.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>FateCal reads your calendar to score each plan by your BaZi chart and suggest better times. It never changes your calendar.</string>
 	<key>NSCalendarsUsageDescription</key>

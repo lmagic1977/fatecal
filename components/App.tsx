@@ -12,7 +12,7 @@ import ShoppingResources from '@/components/ShoppingResources';
 import { CONTACT_EMAIL, ACCOUNTS_ON, SHOPPING_ON } from '@/lib/site';
 import type { MailItem } from '@/lib/mail';
 import { expandRepeats, dateKey } from '@/lib/recur';
-import { isNativeApp, isIosApp, phoneCalendarAllowed, phoneCalendarEvents, notificationsAllowed, setReminders, hashId, type Reminder } from '@/lib/native';
+import { isNativeApp, isIosApp, phoneCalendarAllowed, phoneCalendarEvents, notificationsAllowed, setReminders, hashId, nativeSpeechReady, startNativeSpeech, stopNativeSpeech, type Reminder } from '@/lib/native';
 import { LIMITS, PRICES, TRIAL_DAYS, money, type Interval, type Limits, type Plan } from '@/lib/plans';
 import { trackMeta, trackMetaOnce, markRegistrationPending, consumeRegistrationPending } from '@/lib/meta';
 
@@ -970,6 +970,15 @@ function QuickAdd({ lang, chart, events, onAdd }: { lang: Lang; chart: Chart; ev
   function mic() {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     // In the phone app the web speech API doesn't work: open the keyboard so its own 🎤 dictation can be used
+    if (nativeSpeechReady()) {
+      if (listening) { stopNativeSpeech(); return; }
+      setMsg(''); setListening(true);
+      startNativeSpeech(tLocale(lang), (s) => setText(s), (s, denied) => {
+        setListening(false);
+        if (denied) setMsg(q.micDenied); else if (s) send(s);
+      });
+      return;
+    }
     if (!SR || isNativeApp()) { inputRef.current?.focus(); setMsg(isNativeApp() ? q.micApp : q.micNo); return; }
     if (listening) { recRef.current?.stop(); return; }
     const rec = new SR();
