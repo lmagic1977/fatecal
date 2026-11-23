@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSCameraUsageDescription</key>
+	<string>FateCal uses the camera so you can photograph a room, item or floor plan for a feng shui reading.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>FateCal lets you pick a photo of a room, item or floor plan for a feng shui reading.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>FateCal uses the microphone so you can add a plan by saying it.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
