@@ -12,7 +12,7 @@ import ShoppingResources from '@/components/ShoppingResources';
 import { CONTACT_EMAIL, ACCOUNTS_ON, SHOPPING_ON } from '@/lib/site';
 import type { MailItem } from '@/lib/mail';
 import { expandRepeats, dateKey } from '@/lib/recur';
-import { isNativeApp, isIosApp, phoneCalendarAllowed, phoneCalendarEvents, notificationsAllowed, setReminders, hashId, nativeSpeechReady, startNativeSpeech, stopNativeSpeech, type Reminder } from '@/lib/native';
+import { isNativeApp, isIosApp, phoneCalendarAllowed, phoneCalendarEvents, notificationsAllowed, setReminders, hashId, nativeSpeechReady, startNativeSpeech, stopNativeSpeech, photosOk, type Reminder } from '@/lib/native';
 import { LIMITS, PRICES, TRIAL_DAYS, money, type Interval, type Limits, type Plan } from '@/lib/plans';
 import { trackMeta, trackMetaOnce, markRegistrationPending, consumeRegistrationPending } from '@/lib/meta';
 
@@ -950,6 +950,10 @@ function clearAfterSend(sent: string, set: (f: (cur: string) => string) => void)
   for (const ms of [250, 700, 1500]) setTimeout(() => set((cur) => (cur && (s0.includes(norm(cur)) || norm(cur).includes(s0)) ? '' : cur)), ms);
 }
 
+function alertUpdate(lang: Lang) {
+  window.alert(L3(lang, 'Photos need the latest app version. Update FateCal in TestFlight, then try again.', '拍照功能需要最新版 App。请在 TestFlight 里更新随身吉历后再试。', 'Las fotos necesitan la última versión. Actualiza FateCal en TestFlight y vuelve a intentarlo.'));
+}
+
 // Text box that grows taller with what you type (width stays the same); Enter sends, Shift+Enter adds a line
 const GrowBox = forwardRef<HTMLTextAreaElement, { value: string; onChange: (v: string) => void; onEnter: () => void; placeholder?: string; ariaLabel?: string; id?: string; maxLength?: number }>(
   function GrowBox({ value, onChange, onEnter, placeholder, ariaLabel, id, maxLength }, ref) {
@@ -1346,7 +1350,7 @@ function Ask({ lang, chart, events, profile, seed, clearSeed }: { lang: Lang; ch
       {!busy && (
         <div className="sugg">
           {t.examples.map((ex) => <button key={ex} className="example" onClick={() => send(ex)}>{ex}</button>)}
-          <button className="example" onClick={() => fileRef.current?.click()}>📷 {t.photoExample}</button>
+          <button className="example" onClick={() => (photosOk() ? fileRef.current?.click() : alertUpdate(lang))}>📷 {t.photoExample}</button>
         </div>
       )}
       <form className="composer" onSubmit={(e) => { e.preventDefault(); send(q); }}>
@@ -1361,7 +1365,7 @@ function Ask({ lang, chart, events, profile, seed, clearSeed }: { lang: Lang; ch
           e.target.value = '';
           if (f) { try { setPhoto(await shrinkImage(f)); } catch { /* unreadable image */ } }
         }} />
-        <button type="button" className="iconbtn" onClick={() => fileRef.current?.click()} aria-label={t.addPhoto} disabled={busy}>
+        <button type="button" className="iconbtn" onClick={() => (photosOk() ? fileRef.current?.click() : alertUpdate(lang))} aria-label={t.addPhoto} disabled={busy}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="2.5" /><circle cx="12" cy="12.5" r="3.5" /><path d="M8.5 5l1.5-2h4l1.5 2" /></svg>
         </button>
         {voiceOk && (
@@ -1567,7 +1571,7 @@ function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Ch
           if (!file) return;
           try { ask({ q: f.photoQ, photo: await shrinkImage(file) }); } catch { /* unreadable image */ }
         }} />
-        <button className="primary" onClick={() => fileRef.current?.click()}>{f.photoBtn}</button>
+        <button className="primary" onClick={() => (photosOk() ? fileRef.current?.click() : alertUpdate(lang))}>{f.photoBtn}</button>
         <button className="ghost" onClick={() => ask({ q: f.askMoreQ })}>{f.askMore}</button>
       </section>
       <p className="muted small">{f.note}</p>

@@ -88,3 +88,8 @@ export async function startNativeSpeech(locale: string, onText: (s: string) => v
     silence = setTimeout(() => { S.stop().catch(() => {}); finish(); }, 8000); // nothing said at all
   } catch { finish(); }
 }
+
+// iOS builds 1–2 shipped without camera/photo permission text, and iOS closes the app if a photo is picked there.
+let iosBuild = 0;
+if (typeof window !== 'undefined') setTimeout(() => { if (isIosApp()) plugin('App')?.getInfo?.().then((i: any) => { iosBuild = Number(i?.build) || 0; }).catch(() => {}); }, 0);
+export const photosOk = () => !isIosApp() || iosBuild >= 3;
