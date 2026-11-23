@@ -491,7 +491,7 @@ export const T = {
     reset: '清除所有数据', resetConfirm: '确定从这台设备上删除你的命盘和日程？',
     privacy: '命盘和日程私密保存在你的账号里。日历由服务器只读读取，日程内容不做保存。向 FateBot 提问时，问题和相关解读会发送给我们的 AI 服务商来生成回答。',
     footerPrivacy: '隐私政策', footerTerms: '服务条款', footerContact: '联系我们',
-    verdictLine: { good: '{w}是好日子，重要的事可以往前推。', neutral: '{w}平平稳稳，做做日常的事就好。', bad: '{w}要小心点，大事最好换一天。' },
+    verdictLine: { good: '{w}是好日子，重要的事适合放在这天办。', neutral: '{w}平平稳稳，做做日常的事就好。', bad: '{w}要小心点，大事最好换一天。' },
   },
   es: {
     tagline: 'Tu asesor personal de BaZi. Conoce tu carta, lee tu agenda y te dice cuándo hacer cada cosa.',
