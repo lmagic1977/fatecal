@@ -756,8 +756,28 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
   const [trad, setTrad] = useState(false);
   const sep = lang === 'zh' ? '、' : ', ';
   const todays = events.filter((e) => sameDay(new Date(e.start), day)).sort((a, b) => a.start.localeCompare(b.start));
-  const shift = (n: number) => setDay(new Date(day.getFullYear(), day.getMonth(), day.getDate() + n));
+  const [slide, setSlide] = useState<'' | 'l' | 'r'>('');
+  const shift = (n: number) => { setSlide(n > 0 ? 'l' : 'r'); setDay(new Date(day.getFullYear(), day.getMonth(), day.getDate() + n)); };
   const isToday = sameDay(day, new Date());
+  // swipe left = next day, swipe right = previous day
+  const touch = useRef<{ x: number; y: number } | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => { const p = e.touches[0]; touch.current = { x: p.clientX, y: p.clientY }; };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const s0 = touch.current; touch.current = null; if (!s0) return;
+    const p = e.changedTouches[0], dx = p.clientX - s0.x, dy = p.clientY - s0.y;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) shift(dx < 0 ? 1 : -1);
+  };
+  // if you were looking at today and the date rolls over (app left open overnight), follow to the new today
+  const shownToday = useRef(isToday);
+  shownToday.current = isToday;
+  useEffect(() => {
+    let last = new Date();
+    const check = () => { const now = new Date(); if (!sameDay(now, last)) { if (sameDay(day, last) || shownToday.current) setDay(now); last = now; } };
+    const vis = () => { if (document.visibilityState === 'visible') check(); };
+    document.addEventListener('visibilitychange', vis);
+    const id = setInterval(check, 60000);
+    return () => { document.removeEventListener('visibilitychange', vis); clearInterval(id); };
+  }, [day]);
   const rel = relDay(day, lang);
   const hr = new Date().getHours();
   const hi = v.hi[hr < 12 ? 0 : hr < 18 ? 1 : 2];
@@ -774,6 +794,7 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
     <div className="stack">
       <div className="greet">{hi}{name ? (lang === 'zh' ? `，${name}` : `, ${name}`) : ''} 👋</div>
       <QuickAdd lang={lang} chart={chart} events={events} onAdd={(evs) => { setManual([...manual, ...evs]); const d = new Date(evs[0].start); if (!sameDay(d, day)) setDay(d); }} />
+      <div className="swipeday" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <div className="daynav">
         <button className="icon" onClick={() => shift(-1)} aria-label={t.prevDay}>‹</button>
         <div className="dayhead">
@@ -783,7 +804,7 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
         <button className="icon" onClick={() => shift(1)} aria-label={t.nextDay}>›</button>
       </div>
 
-      <section className="herocard">
+      <section key={day.toDateString()} className={`herocard${slide ? ` slide-${slide}` : ''}`}>
         <ScoreRing score={summary.score} label={v.scoreOf(rel.word)} />
         <div className="grow">
           <span className={`vpill ${summary.verdict}`}><i />{t[summary.verdict]}</span>
@@ -812,6 +833,7 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
             {acts.avoid.length ? acts.avoid.slice(0, 5).map((a) => <span key={a.cat} className="chip avoid">{CAT_EMOJI[a.cat]} {activityName(a.cat, lang)}</span>) : <span className="chip none">{t.nothingMajor}</span>}
           </div>
         </section>
+      </div>
       </div>
 
       <div className="sechead"><h3>{t.bestHours}</h3><span className="small muted">{v.hoursSub}</span></div>

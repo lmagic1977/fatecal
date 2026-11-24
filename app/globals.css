@@ -538,3 +538,8 @@ textarea.growbox { font: inherit; font-size: 16px; line-height: 1.4; width: 100%
 .composer textarea#q { flex: 1; min-width: 120px; box-shadow: var(--shadow); border: none; }
 textarea.growbox:focus { outline: 2px solid var(--brand-2); outline-offset: 0; border-color: transparent; }
 textarea.growbox:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.swipeday { display: flex; flex-direction: column; gap: inherit; touch-action: pan-y; }
+.herocard.slide-l { animation: slideL .28s ease-out; }
+.herocard.slide-r { animation: slideR .28s ease-out; }
+@keyframes slideL { from { transform: translateX(40px); opacity: .3; } to { transform: none; opacity: 1; } }
+@keyframes slideR { from { transform: translateX(-40px); opacity: .3; } to { transform: none; opacity: 1; } }
