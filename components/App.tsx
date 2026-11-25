@@ -13,6 +13,8 @@ import { CONTACT_EMAIL, ACCOUNTS_ON, SHOPPING_ON } from '@/lib/site';
 import type { MailItem } from '@/lib/mail';
 import { expandRepeats, dateKey } from '@/lib/recur';
 import { dailyTips } from '@/lib/dailyTips';
+import dynamic from 'next/dynamic';
+const DirectionMap = dynamic(() => import('./DirectionMap'), { ssr: false });
 import { isNativeApp, isIosApp, phoneCalendarAllowed, phoneCalendarEvents, notificationsAllowed, setReminders, hashId, nativeSpeechReady, startNativeSpeech, stopNativeSpeech, photosOk, type Reminder } from '@/lib/native';
 import { LIMITS, PRICES, TRIAL_DAYS, money, type Interval, type Limits, type Plan } from '@/lib/plans';
 import { trackMeta, trackMetaOnce, markRegistrationPending, consumeRegistrationPending } from '@/lib/meta';
@@ -1002,6 +1004,9 @@ function TipsSheet({ lang, chart, day, word, summary, acts, onClose }: { lang: L
         <section><h3>🧭 {L3(lang, 'Lucky directions', '吉利方位', 'Direcciones de suerte')}</h3>
           <div className="tipdirs">{d.lucky.map((x) => <div key={x.label}><b>{x.dir}</b><span>{x.label}</span></div>)}</div>
           <p className="small">⚠️ {L3(lang, `Avoid starting important things facing ${d.avoidDir} (sha). People born in the Year of the ${d.clashAnimal} should keep a low profile ${word === 'Today' ? 'today' : word.toLowerCase()}.`, `避开${d.avoidDir}（${word === '今天' ? '今日' : word}煞方）。属${d.clashAnimal}的人${word}宜低调。`, `Evita el ${d.avoidDir} (sha). Los nacidos en el año del ${d.clashAnimal} deben ir con calma ${word === 'Hoy' ? 'hoy' : word.toLowerCase()}.`)}</p>
+        </section>
+        <section><h3>🗺️ {L3(lang, 'Directions on a map', '方位地图', 'Direcciones en el mapa')}</h3>
+          <DirectionMap lang={lang} lucky={d.lucky.map((x) => ({ raw: x.raw, label: x.label.replace(/\s*\(.*\)/, ''), dir: x.dir }))} sha={d.shaRaw} shaLabel={L3(lang, `Sha · avoid ${d.avoidDir}`, `煞方 · 避开${d.avoidDir}`, `Sha · evita el ${d.avoidDir}`)} />
         </section>
         <section><h3>✅ {L3(lang, 'Good for', '适合做', 'Bueno para')}</h3><p>{acts.good.length ? acts.good.slice(0, 6).map((a) => `${CAT_EMOJI[a.cat]} ${activityName(a.cat, lang)}`).join(sep) : t.routineOnly}</p>
           {best && <p className="small">⏰ {L3(lang, `Best hours: ${best}`, `最顺时段：${best}`, `Mejores horas: ${best}`)}</p>}</section>

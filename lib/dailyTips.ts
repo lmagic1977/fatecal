@@ -42,7 +42,8 @@ export interface DailyTips {
   dayGz: string;
   kind: string;          // what kind of day it is for you (element relation)
   branchNote?: string;   // clash / harmony with your year or day branch
-  lucky: { label: string; dir: string }[];
+  lucky: { label: string; dir: string; raw: string }[];
+  shaRaw: string;
   avoidDir: string;
   clashAnimal: string;   // people of this zodiac should keep a low profile
   colors: string; numbers: string; item: string;
@@ -81,9 +82,9 @@ export function dailyTips(chart: Chart, date: Date, verdict: 'good' | 'mixed' | 
   }
 
   const lucky = [
-    { label: t('Joy (喜神)', '喜神', 'Alegría (喜神)'), dir: dir(lunar.getDayPositionXiDesc(), lang) },
-    { label: t('Wealth (财神)', '财神', 'Riqueza (财神)'), dir: dir(lunar.getDayPositionCaiDesc(), lang) },
-    { label: t('Blessing (福神)', '福神', 'Bendición (福神)'), dir: dir(lunar.getDayPositionFuDesc(), lang) },
+    { label: t('Joy (喜神)', '喜神', 'Alegría (喜神)'), dir: dir(lunar.getDayPositionXiDesc(), lang), raw: lunar.getDayPositionXiDesc() },
+    { label: t('Wealth (财神)', '财神', 'Riqueza (财神)'), dir: dir(lunar.getDayPositionCaiDesc(), lang), raw: lunar.getDayPositionCaiDesc() },
+    { label: t('Blessing (福神)', '福神', 'Bendición (福神)'), dir: dir(lunar.getDayPositionFuDesc(), lang), raw: lunar.getDayPositionFuDesc() },
   ];
   const sha = lunar.getDaySha();
   const avoidDir = dir(sha, lang);
@@ -104,5 +105,5 @@ export function dailyTips(chart: Chart, date: Date, verdict: 'good' | 'mixed' | 
     remedies.push(t('If things feel stuck: move key decisions into your best hours, take a short walk toward your Joy direction, and keep your words gentle.', '如果觉得不顺：把重要决定挪到最顺的时段，往喜神方向走一走，说话放软一点。', 'Si algo se traba: pasa las decisiones a tus mejores horas, camina un poco hacia la dirección de Alegría y habla con suavidad.'));
   }
 
-  return { dayGz: gz, kind, branchNote, lucky, avoidDir, clashAnimal, colors, numbers, item, remedies };
+  return { shaRaw: sha, dayGz: gz, kind, branchNote, lucky, avoidDir, clashAnimal, colors, numbers, item, remedies };
 }

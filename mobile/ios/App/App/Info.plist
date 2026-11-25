@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>FateCal uses your location only to draw the day's lucky directions on a map around you.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>FateCal uses the camera so you can photograph a room, item or floor plan for a feng shui reading.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

@@ -557,3 +557,11 @@ textarea.growbox:placeholder-shown { white-space: nowrap; overflow: hidden; text
 .tipdirs div { background: #fff; border-radius: 12px; padding: 8px; text-align: center; display: flex; flex-direction: column; gap: 2px; }
 .tipdirs b { font-size: 17px; color: var(--brand-2); }
 .tipdirs span { font-size: 12px; color: var(--muted, #6b6880); }
+.dirmap { height: 280px; border-radius: 12px; overflow: hidden; margin: 6px 0; z-index: 0; }
+.dirmap-ask { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.dirpin { background: none; border: none; }
+.leaflet-tooltip.dirtip { background: transparent; border: none; box-shadow: none; font-weight: 800; font-size: 13px; padding: 0; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; }
+.leaflet-tooltip.dirtip::before { display: none; }
+.leaflet-tooltip.dirtip.good { color: #1F7A50; }
+.leaflet-tooltip.dirtip.bad { color: #C0303A; }
+.leaflet-tooltip.dirtip.nesw { color: #5B5880; font-size: 14px; }
