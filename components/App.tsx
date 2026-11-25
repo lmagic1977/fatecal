@@ -12,6 +12,7 @@ import ShoppingResources from '@/components/ShoppingResources';
 import { CONTACT_EMAIL, ACCOUNTS_ON, SHOPPING_ON } from '@/lib/site';
 import type { MailItem } from '@/lib/mail';
 import { expandRepeats, dateKey } from '@/lib/recur';
+import { dailyTips } from '@/lib/dailyTips';
 import { isNativeApp, isIosApp, phoneCalendarAllowed, phoneCalendarEvents, notificationsAllowed, setReminders, hashId, nativeSpeechReady, startNativeSpeech, stopNativeSpeech, photosOk, type Reminder } from '@/lib/native';
 import { LIMITS, PRICES, TRIAL_DAYS, money, type Interval, type Limits, type Plan } from '@/lib/plans';
 import { trackMeta, trackMetaOnce, markRegistrationPending, consumeRegistrationPending } from '@/lib/meta';
@@ -754,6 +755,7 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
   const summary = useMemo(() => scoreDay(chart, day), [chart, day]);
   const acts = useMemo(() => dayActivities(chart, day), [chart, day]);
   const [trad, setTrad] = useState(false);
+  const [tips, setTips] = useState(false);
   const sep = lang === 'zh' ? '、' : ', ';
   const todays = events.filter((e) => sameDay(new Date(e.start), day)).sort((a, b) => a.start.localeCompare(b.start));
   const [slide, setSlide] = useState<'' | 'l' | 'r'>('');
@@ -794,6 +796,7 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
     <div className="stack">
       <div className="greet">{hi}{name ? (lang === 'zh' ? `，${name}` : `, ${name}`) : ''} 👋</div>
       <QuickAdd lang={lang} chart={chart} events={events} onAdd={(evs) => { setManual([...manual, ...evs]); const d = new Date(evs[0].start); if (!sameDay(d, day)) setDay(d); }} />
+      {tips && <TipsSheet lang={lang} chart={chart} day={day} word={rel.word} summary={summary} acts={acts} onClose={() => setTips(false)} />}
       <div className="swipeday" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <div className="daynav">
         <button className="icon" onClick={() => shift(-1)} aria-label={t.prevDay}>‹</button>
@@ -804,13 +807,17 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
         <button className="icon" onClick={() => shift(1)} aria-label={t.nextDay}>›</button>
       </div>
 
-      <section key={day.toDateString()} className={`herocard${slide ? ` slide-${slide}` : ''}`}>
+      <section key={day.toDateString()} className={`herocard tappable${slide ? ` slide-${slide}` : ''}`} role="button" tabIndex={0} aria-label={L3(lang, "Open today's life tips", '打开今日生活提示', 'Abrir consejos del día')}
+        onClick={(e) => { if (!(e.target as HTMLElement).closest('button, a')) setTips(true); }} onKeyDown={(e) => { if (e.key === 'Enter') setTips(true); }}>
         <ScoreRing score={summary.score} label={v.scoreOf(rel.word)} />
         <div className="grow">
           <span className={`vpill ${summary.verdict}`}><i />{t[summary.verdict]}</span>
           <h2>{t.verdictLine[summary.verdict].replace('{w}', rel.word)}</h2>
           {best && <p>{v.window(fmtHour(best.start, lang), fmtHour(best.start + 2, lang), rel.word)}</p>}
-          <button className="link light" onClick={() => setTrad(!trad)} aria-expanded={trad}>{trad ? t.hideAlmanac : t.showAlmanac}</button>
+          <div className="row gap" style={{ flexWrap: 'wrap' }}>
+            <button className="tipsbtn" onClick={() => setTips(true)}>✨ {L3(lang, rel.word === 'Today' ? "Today's life tips" : `Life tips for ${rel.word.toLowerCase()}`, rel.word === '今天' ? '今日生活提示' : `${rel.word}生活提示`, `Consejos de ${rel.word.toLowerCase()}`)} ›</button>
+            <button className="link light" onClick={() => setTrad(!trad)} aria-expanded={trad}>{trad ? t.hideAlmanac : t.showAlmanac}</button>
+          </div>
           {trad && (
             <div className="trad">
               <p><b>{L3(lang, 'Almanac yi', '宜', 'Almanaque: sí')}:</b> {summary.yi.map((w) => almanac(w, lang)).join(sep)}</p>
@@ -974,6 +981,38 @@ function clearAfterSend(sent: string, set: (f: (cur: string) => string) => void)
 
 function alertUpdate(lang: Lang) {
   window.alert(L3(lang, 'Photos need the latest app version. Update FateCal in TestFlight, then try again.', '拍照功能需要最新版 App。请在 TestFlight 里更新随身吉历后再试。', 'Las fotos necesitan la última versión. Actualiza FateCal en TestFlight y vuelve a intentarlo.'));
+}
+
+// 今日生活提示: what today means for your chart, lucky directions, do / don't, and simple remedies
+function TipsSheet({ lang, chart, day, word, summary, acts, onClose }: { lang: Lang; chart: Chart; day: Date; word: string; summary: ReturnType<typeof scoreDay>; acts: ReturnType<typeof dayActivities>; onClose: () => void }) {
+  const t = T[lang];
+  const d = useMemo(() => dailyTips(chart, day, summary.verdict, lang), [chart, day, summary.verdict, lang]);
+  const sep = lang === 'zh' ? '、' : ', ';
+  const best = summary.bestHours.slice(0, 2).map((h) => `${fmtHour(h.start, lang)}–${fmtHour(h.start + 2, lang)}`).join(sep);
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [onClose]);
+  return (
+    <div className="sheet-bg" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="sheet tips" role="dialog" aria-modal="true" aria-labelledby="tips-h">
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 id="tips-h">✨ {L3(lang, `Life tips · ${word}`, word === '今天' ? '今日生活提示' : `${word}生活提示`, `Consejos · ${word}`)}</h2>
+          <button className="icon sm" onClick={onClose} aria-label={L3(lang, 'Close', '关闭', 'Cerrar')}>✕</button>
+        </div>
+        <p className="tips-lead"><span className="han">{d.dayGz}</span> · {summary.score} {t[summary.verdict]}</p>
+        <section><h3>🔮 {L3(lang, 'What kind of day', '今天是什么日子', 'Qué tipo de día')}</h3><p>{d.kind}</p>{d.branchNote && <p>{d.branchNote}</p>}</section>
+        <section><h3>🧭 {L3(lang, 'Lucky directions', '吉利方位', 'Direcciones de suerte')}</h3>
+          <div className="tipdirs">{d.lucky.map((x) => <div key={x.label}><b>{x.dir}</b><span>{x.label}</span></div>)}</div>
+          <p className="small">⚠️ {L3(lang, `Avoid starting important things facing ${d.avoidDir} (sha). People born in the Year of the ${d.clashAnimal} should keep a low profile today.`, `避开${d.avoidDir}（今日煞方）。属${d.clashAnimal}的人今天宜低调。`, `Evita el ${d.avoidDir} (sha). Los nacidos en el año del ${d.clashAnimal} deben ir con calma hoy.`)}</p>
+        </section>
+        <section><h3>✅ {L3(lang, 'Good for', '适合做', 'Bueno para')}</h3><p>{acts.good.length ? acts.good.slice(0, 6).map((a) => `${CAT_EMOJI[a.cat]} ${activityName(a.cat, lang)}`).join(sep) : t.routineOnly}</p>
+          {best && <p className="small">⏰ {L3(lang, `Best hours: ${best}`, `最顺时段：${best}`, `Mejores horas: ${best}`)}</p>}</section>
+        <section><h3>🚫 {L3(lang, 'Better not', '不适合做', 'Mejor evitar')}</h3><p>{acts.avoid.length ? acts.avoid.slice(0, 6).map((a) => `${CAT_EMOJI[a.cat]} ${activityName(a.cat, lang)}`).join(sep) : t.nothingMajor}</p></section>
+        <section><h3>🎨 {L3(lang, 'Your luck boosters', '今日开运', 'Para tu suerte')}</h3>
+          <p>{L3(lang, 'Lucky colors: ', '幸运色：', 'Colores: ')}<b>{d.colors}</b></p><p>{L3(lang, 'Lucky numbers: ', '幸运数字：', 'Números: ')}<b>{d.numbers}</b></p></section>
+        <section><h3>🪬 {L3(lang, 'If things feel off, try', '不顺时怎么化解', 'Si algo no fluye')}</h3><ul>{d.remedies.map((r) => <li key={r}>{r}</li>)}</ul></section>
+        <p className="tiny muted">{L3(lang, 'Traditional Chinese almanac and BaZi for reference.', '依据传统黄历与八字，供参考。', 'Basado en el almanaque chino y BaZi, como referencia.')}</p>
+      </div>
+    </div>
+  );
 }
 
 // Text box that grows taller with what you type (width stays the same); Enter sends, Shift+Enter adds a line
