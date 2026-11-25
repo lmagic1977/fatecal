@@ -986,7 +986,7 @@ function alertUpdate(lang: Lang) {
 // 今日生活提示: what today means for your chart, lucky directions, do / don't, and simple remedies
 function TipsSheet({ lang, chart, day, word, summary, acts, onClose }: { lang: Lang; chart: Chart; day: Date; word: string; summary: ReturnType<typeof scoreDay>; acts: ReturnType<typeof dayActivities>; onClose: () => void }) {
   const t = T[lang];
-  const d = useMemo(() => dailyTips(chart, day, summary.verdict, lang), [chart, day, summary.verdict, lang]);
+  const d = useMemo(() => dailyTips(chart, day, summary.verdict, lang, word), [chart, day, summary.verdict, lang, word]);
   const sep = lang === 'zh' ? '、' : ', ';
   const best = summary.bestHours.slice(0, 2).map((h) => `${fmtHour(h.start, lang)}–${fmtHour(h.start + 2, lang)}`).join(sep);
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [onClose]);
@@ -998,15 +998,15 @@ function TipsSheet({ lang, chart, day, word, summary, acts, onClose }: { lang: L
           <button className="icon sm" onClick={onClose} aria-label={L3(lang, 'Close', '关闭', 'Cerrar')}>✕</button>
         </div>
         <p className="tips-lead"><span className="han">{d.dayGz}</span> · {summary.score} {t[summary.verdict]}</p>
-        <section><h3>🔮 {L3(lang, 'What kind of day', '今天是什么日子', 'Qué tipo de día')}</h3><p>{d.kind}</p>{d.branchNote && <p>{d.branchNote}</p>}</section>
+        <section><h3>🔮 {L3(lang, 'What kind of day', `${word}是什么日子`, 'Qué tipo de día')}</h3><p>{d.kind}</p>{d.branchNote && <p>{d.branchNote}</p>}</section>
         <section><h3>🧭 {L3(lang, 'Lucky directions', '吉利方位', 'Direcciones de suerte')}</h3>
           <div className="tipdirs">{d.lucky.map((x) => <div key={x.label}><b>{x.dir}</b><span>{x.label}</span></div>)}</div>
-          <p className="small">⚠️ {L3(lang, `Avoid starting important things facing ${d.avoidDir} (sha). People born in the Year of the ${d.clashAnimal} should keep a low profile today.`, `避开${d.avoidDir}（今日煞方）。属${d.clashAnimal}的人今天宜低调。`, `Evita el ${d.avoidDir} (sha). Los nacidos en el año del ${d.clashAnimal} deben ir con calma hoy.`)}</p>
+          <p className="small">⚠️ {L3(lang, `Avoid starting important things facing ${d.avoidDir} (sha). People born in the Year of the ${d.clashAnimal} should keep a low profile ${word === 'Today' ? 'today' : word.toLowerCase()}.`, `避开${d.avoidDir}（${word === '今天' ? '今日' : word}煞方）。属${d.clashAnimal}的人${word}宜低调。`, `Evita el ${d.avoidDir} (sha). Los nacidos en el año del ${d.clashAnimal} deben ir con calma ${word === 'Hoy' ? 'hoy' : word.toLowerCase()}.`)}</p>
         </section>
         <section><h3>✅ {L3(lang, 'Good for', '适合做', 'Bueno para')}</h3><p>{acts.good.length ? acts.good.slice(0, 6).map((a) => `${CAT_EMOJI[a.cat]} ${activityName(a.cat, lang)}`).join(sep) : t.routineOnly}</p>
           {best && <p className="small">⏰ {L3(lang, `Best hours: ${best}`, `最顺时段：${best}`, `Mejores horas: ${best}`)}</p>}</section>
         <section><h3>🚫 {L3(lang, 'Better not', '不适合做', 'Mejor evitar')}</h3><p>{acts.avoid.length ? acts.avoid.slice(0, 6).map((a) => `${CAT_EMOJI[a.cat]} ${activityName(a.cat, lang)}`).join(sep) : t.nothingMajor}</p></section>
-        <section><h3>🎨 {L3(lang, 'Your luck boosters', '今日开运', 'Para tu suerte')}</h3>
+        <section><h3>🎨 {L3(lang, 'Your luck boosters', word === '今天' ? '今日开运' : `${word}开运`, 'Para tu suerte')}</h3>
           <p>{L3(lang, 'Lucky colors: ', '幸运色：', 'Colores: ')}<b>{d.colors}</b></p><p>{L3(lang, 'Lucky numbers: ', '幸运数字：', 'Números: ')}<b>{d.numbers}</b></p></section>
         <section><h3>🪬 {L3(lang, 'If things feel off, try', '不顺时怎么化解', 'Si algo no fluye')}</h3><ul>{d.remedies.map((r) => <li key={r}>{r}</li>)}</ul></section>
         <p className="tiny muted">{L3(lang, 'Traditional Chinese almanac and BaZi for reference.', '依据传统黄历与八字，供参考。', 'Basado en el almanaque chino y BaZi, como referencia.')}</p>

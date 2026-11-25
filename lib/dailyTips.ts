@@ -49,7 +49,8 @@ export interface DailyTips {
   remedies: string[];
 }
 
-export function dailyTips(chart: Chart, date: Date, verdict: 'good' | 'mixed' | 'poor' | string, lang: Lang): DailyTips {
+export function dailyTips(chart: Chart, date: Date, verdict: 'good' | 'mixed' | 'poor' | string, lang: Lang, word?: string): DailyTips {
+  const W = word || (lang === 'zh' ? '今天' : lang === 'es' ? 'Hoy' : 'Today');
   const noon = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12);
   const lunar = Solar.fromDate(noon).getLunar();
   const gz = lunar.getDayInGanZhi();
@@ -59,11 +60,11 @@ export function dailyTips(chart: Chart, date: Date, verdict: 'good' | 'mixed' | 
   const fav = chart.favorable.includes(dEl);
 
   let kind: string;
-  if (dEl === me) kind = t(`A ${E(dEl)} day, the same element as you: friends and teamwork help, but don't be stubborn.`, `今天是${E(dEl)}日，和你的日主同五行：朋友、同事帮得上忙，但别太固执。`, `Día de ${E(dEl)}, tu mismo elemento: amigos y equipo ayudan, pero no seas terco.`);
-  else if (GEN[dEl] === me) kind = t(`A ${E(dEl)} day that feeds your ${E(me)}: good for learning, getting help and support.`, `今天是${E(dEl)}日，${E(dEl)}生${E(me)}，生扶你：适合学习、求助、找贵人。`, `Día de ${E(dEl)} que nutre tu ${E(me)}: bueno para aprender y pedir apoyo.`);
-  else if (GEN[me] === dEl) kind = t(`A ${E(dEl)} day: your ${E(me)} feeds it, so you give out energy. Good for creating and showing your work; rest enough.`, `今天是${E(dEl)}日，${E(me)}生${E(dEl)}，是你付出的一天：适合创作、表达、展示成果，注意别太累。`, `Día de ${E(dEl)}: tu ${E(me)} lo alimenta, das energía. Bueno para crear y mostrar tu trabajo; descansa.`);
-  else if (CTL[me] === dEl) kind = t(`A ${E(dEl)} day that your ${E(me)} controls: a money day. Good for deals, sales and getting paid, if you stay focused.`, `今天是${E(dEl)}日，${E(me)}克${E(dEl)}，是「财」日：适合谈生意、收款、成交，专注就有收获。`, `Día de ${E(dEl)} que tu ${E(me)} controla: día de dinero. Bueno para negocios y cobros si te enfocas.`);
-  else kind = t(`A ${E(dEl)} day that presses on your ${E(me)}: a day of pressure and rules. Do things by the book, keep a low profile, and good discipline pays off.`, `今天是${E(dEl)}日，${E(dEl)}克${E(me)}，是「官杀」日：压力和规矩多，按规矩办事、低调一点，自律反而有回报。`, `Día de ${E(dEl)} que presiona tu ${E(me)}: presión y reglas. Sigue las normas y mantén un perfil bajo.`);
+  if (dEl === me) kind = t(`A ${E(dEl)} day, the same element as you: friends and teamwork help, but don't be stubborn.`, `${W}是${E(dEl)}日，和你的日主同五行：朋友、同事帮得上忙，但别太固执。`, `Día de ${E(dEl)}, tu mismo elemento: amigos y equipo ayudan, pero no seas terco.`);
+  else if (GEN[dEl] === me) kind = t(`A ${E(dEl)} day that feeds your ${E(me)}: good for learning, getting help and support.`, `${W}是${E(dEl)}日，${E(dEl)}生${E(me)}，生扶你：适合学习、求助、找贵人。`, `Día de ${E(dEl)} que nutre tu ${E(me)}: bueno para aprender y pedir apoyo.`);
+  else if (GEN[me] === dEl) kind = t(`A ${E(dEl)} day: your ${E(me)} feeds it, so you give out energy. Good for creating and showing your work; rest enough.`, `${W}是${E(dEl)}日，${E(me)}生${E(dEl)}，是你付出的一天：适合创作、表达、展示成果，注意别太累。`, `Día de ${E(dEl)}: tu ${E(me)} lo alimenta, das energía. Bueno para crear y mostrar tu trabajo; descansa.`);
+  else if (CTL[me] === dEl) kind = t(`A ${E(dEl)} day that your ${E(me)} controls: a money day. Good for deals, sales and getting paid, if you stay focused.`, `${W}是${E(dEl)}日，${E(me)}克${E(dEl)}，是「财」日：适合谈生意、收款、成交，专注就有收获。`, `Día de ${E(dEl)} que tu ${E(me)} controla: día de dinero. Bueno para negocios y cobros si te enfocas.`);
+  else kind = t(`A ${E(dEl)} day that presses on your ${E(me)}: a day of pressure and rules. Do things by the book, keep a low profile, and good discipline pays off.`, `${W}是${E(dEl)}日，${E(dEl)}克${E(me)}，是「官杀」日：压力和规矩多，按规矩办事、低调一点，自律反而有回报。`, `Día de ${E(dEl)} que presiona tu ${E(me)}: presión y reglas. Sigue las normas y mantén un perfil bajo.`);
   kind += ' ' + (fav ? t(`${E(dEl)} is one of your lucky elements, so it leans in your favor.`, `${E(dEl)}正是你的喜用神，整体对你有利。`, `${E(dEl)} es uno de tus elementos favorables: te favorece.`)
     : t(`${E(dEl)} isn't one of your lucky elements, so go steady.`, `${E(dEl)}不是你的喜用神，稳一点更好。`, `${E(dEl)} no es de tus elementos favorables: ve con calma.`));
 
@@ -74,9 +75,9 @@ export function dailyTips(chart: Chart, date: Date, verdict: 'good' | 'mixed' | 
   if (rel(chart.dayBranch) === 'clash' || rel(chart.yearBranch) === 'clash') {
     clash = true;
     const which = rel(chart.dayBranch) === 'clash' ? t('your day pillar (self and partner)', '你的日支（自己、配偶宫）', 'tu pilar del día (tú y tu pareja)') : t('your birth-year animal', '你的生肖（年支）', 'tu animal del año');
-    branchNote = t(`Today's ${BRANCH[dBr].animal} clashes with ${which}: expect changes and friction. Avoid big moves and arguments; double-check plans.`, `今天的日支${dBr}冲${which}：容易有变动、摩擦。避免大动作和争执，计划多确认一遍。`, `El ${ANIMAL[BRANCH[dBr].zh]?.es ?? dBr} de hoy choca con ${which}: cambios y roces. Evita grandes movimientos y discusiones.`);
+    branchNote = t(`${W}'s ${BRANCH[dBr].animal} clashes with ${which}: expect changes and friction. Avoid big moves and arguments; double-check plans.`, `${W}的日支${dBr}冲${which}：容易有变动、摩擦。避免大动作和争执，计划多确认一遍。`, `El ${ANIMAL[BRANCH[dBr].zh]?.es ?? dBr} del día choca con ${which}: cambios y roces. Evita grandes movimientos y discusiones.`);
   } else if (['harmony', 'trine'].includes(rel(chart.dayBranch)) || ['harmony', 'trine'].includes(rel(chart.yearBranch))) {
-    branchNote = t(`Today's ${BRANCH[dBr].animal} harmonizes with your chart: people are easier to work with today.`, `今天的日支${dBr}和你的命盘相合：人缘好，沟通顺。`, `El día armoniza con tu carta: la gente es más fácil de tratar.`);
+    branchNote = t(`${W}'s ${BRANCH[dBr].animal} harmonizes with your chart: people are easier to work with.`, `${W}的日支${dBr}和你的命盘相合：人缘好，沟通顺。`, `El día armoniza con tu carta: la gente es más fácil de tratar.`);
   }
 
   const lucky = [
@@ -95,10 +96,10 @@ export function dailyTips(chart: Chart, date: Date, verdict: 'good' | 'mixed' | 
   const item = ITEM[f1][lang];
 
   const remedies: string[] = [];
-  remedies.push(t(`Wear or carry your lucky color today: ${colors}.`, `今天穿戴你的幸运色：${colors}。`, `Usa tu color de suerte: ${colors}.`));
+  remedies.push(t(`Wear or carry your lucky color ${W === 'Today' ? 'today' : W.toLowerCase()}: ${colors}.`, `${W}穿戴你的幸运色：${colors}。`, `Usa tu color de suerte: ${colors}.`));
   remedies.push(t(`Boost your lucky element (${E(f1)}): ${item}.`, `补你的喜用神（${E(f1)}）：${item}。`, `Refuerza tu elemento (${E(f1)}): ${item}.`));
   remedies.push(t(`For money matters, face or head ${lucky[1].dir}; for mood and relationships, ${lucky[0].dir}.`, `谈钱的事，坐或走向${lucky[1].dir}（财神方）；求人缘、心情，往${lucky[0].dir}（喜神方）。`, `Para dinero, mira o ve hacia el ${lucky[1].dir}; para ánimo y relaciones, hacia el ${lucky[0].dir}.`));
-  remedies.push(t(`Don't start important things facing ${avoidDir} (today's sha direction).`, `重要的事不要面朝${avoidDir}（今日煞方）开始。`, `No empieces cosas importantes mirando al ${avoidDir} (dirección sha de hoy).`));
+  remedies.push(t(`Don't start important things facing ${avoidDir} (the day's sha direction).`, `重要的事不要面朝${avoidDir}（当日煞方）开始。`, `No empieces cosas importantes mirando al ${avoidDir} (dirección sha del día).`));
   if (verdict !== 'good' || clash) {
     remedies.push(t('If things feel stuck: move key decisions into your best hours, take a short walk toward your Joy direction, and keep your words gentle.', '如果觉得不顺：把重要决定挪到最顺的时段，往喜神方向走一走，说话放软一点。', 'Si algo se traba: pasa las decisiones a tus mejores horas, camina un poco hacia la dirección de Alegría y habla con suavidad.'));
   }
