@@ -4,11 +4,12 @@ import App from '@/components/App';
 import { homeJsonLd, homeMetadata } from '@/lib/seo';
 
 // First paint in the visitor's language (from the browser's Accept-Language), so there is no English flash.
-function fromHeader(h: string | null): 'en' | 'zh' | 'es' {
+function fromHeader(h: string | null): 'en' | 'zh' | 'es' | 'pt' {
   for (const part of (h ?? '').split(',')) {
     const p = part.trim().toLowerCase().slice(0, 2);
     if (p === 'zh') return 'zh';
     if (p === 'es') return 'es';
+    if (p === 'pt') return 'pt';
     if (p === 'en') return 'en';
   }
   return 'en';

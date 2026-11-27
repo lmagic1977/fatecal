@@ -39,24 +39,26 @@ export type SendResult = 'sent' | 'wait' | 'failed';
 export const isTestEmail = (e: string) => !!process.env.TEST_LOGIN_EMAIL && !!process.env.TEST_LOGIN_CODE && e === process.env.TEST_LOGIN_EMAIL.trim().toLowerCase();
 export const testCodeOk = (e: string, code: string) => isTestEmail(e) && code === process.env.TEST_LOGIN_CODE;
 
-export async function sendEmailCode(email: string, lang: 'en' | 'zh' | 'es'): Promise<SendResult> {
+export async function sendEmailCode(email: string, lang: 'en' | 'zh' | 'es' | 'pt'): Promise<SendResult> {
   const id = `email:${email}`;
   const old = await read(id);
   if (old && Date.now() - old.sent < 45_000) return 'wait';
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
   try { await write(id, { h: mac(id, code), exp: Date.now() + 10 * 60_000, tries: 0, sent: Date.now() }); } catch { return 'failed'; }
-  const zh = lang === 'zh', es = lang === 'es';
-  const subject = zh ? `你的随身吉历（FateCal）登录码：${code}` : es ? `Tu código de acceso a FateCal: ${code}` : `Your FateCal sign-in code: ${code}`;
-  const text = es
+  const zh = lang === 'zh', es = lang === 'es', pt = lang === 'pt';
+  const subject = zh ? `你的随身吉历（FateCal）登录码：${code}` : pt ? `Seu código de acesso ao FateCal: ${code}` : es ? `Tu código de acceso a FateCal: ${code}` : `Your FateCal sign-in code: ${code}`;
+  const text = pt
+    ? `Seu código de acesso ao FateCal é ${code}\n\nEle expira em 10 minutos. Se você não pediu, pode ignorar este e-mail.\n\nFateCal · fatecal.com`
+    : es
     ? `Tu código de acceso a FateCal es ${code}\n\nCaduca en 10 minutos. Si no lo pediste, puedes ignorar este correo.\n\nFateCal · fatecal.com`
     : zh
     ? `你的随身吉历（FateCal）登录码是 ${code}\n\n10 分钟内有效。如果不是你本人操作，忽略这封邮件即可。\n\n随身吉历 FateCal · fatecal.com`
     : `Your FateCal sign-in code is ${code}\n\nIt expires in 10 minutes. If you didn't ask for it, you can ignore this email.\n\nFateCal · fatecal.com`;
   const html = `<div style="font-family:system-ui,sans-serif;max-width:420px;margin:auto;padding:24px;color:#1f1b16">
 <div style="font-weight:700;font-size:20px;margin-bottom:16px">FateCal</div>
-<p>${zh ? '你的登录码：' : es ? 'Tu código de acceso:' : 'Your sign-in code:'}</p>
+<p>${zh ? '你的登录码：' : pt ? 'Seu código de acesso:' : es ? 'Tu código de acceso:' : 'Your sign-in code:'}</p>
 <div style="font-size:32px;letter-spacing:6px;font-weight:700;margin:12px 0">${code}</div>
-<p style="color:#6b6257;font-size:14px">${zh ? '10 分钟内有效。如果不是你本人操作，忽略这封邮件即可。' : es ? 'Caduca en 10 minutos. Si no lo pediste, puedes ignorar este correo.' : "It expires in 10 minutes. If you didn't ask for it, you can ignore this email."}</p></div>`;
+<p style="color:#6b6257;font-size:14px">${zh ? '10 分钟内有效。如果不是你本人操作，忽略这封邮件即可。' : pt ? 'Ele expira em 10 minutos. Se você não pediu, pode ignorar este e-mail.' : es ? 'Caduca en 10 minutos. Si no lo pediste, puedes ignorar este correo.' : "It expires in 10 minutes. If you didn't ask for it, you can ignore this email."}</p></div>`;
   const res = await fetch('https://api.postmarkapp.com/email', {
     method: 'POST',
     headers: { accept: 'application/json', 'content-type': 'application/json', 'X-Postmark-Server-Token': process.env.POSTMARK_SERVER_TOKEN! },
@@ -83,7 +85,7 @@ const twilio = (path: string, form: Record<string, string>) =>
     body: new URLSearchParams(form),
   }).catch(() => null);
 
-export async function sendPhoneCode(phone: string, lang: 'en' | 'zh' | 'es'): Promise<SendResult> {
+export async function sendPhoneCode(phone: string, lang: 'en' | 'zh' | 'es' | 'pt'): Promise<SendResult> {
   const res = await twilio('Verifications', { To: phone, Channel: 'sms', Locale: lang });
   if (res?.status === 429) return 'wait';
   return res && res.ok ? 'sent' : 'failed';

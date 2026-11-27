@@ -37,6 +37,6 @@ export async function POST(req: Request) {
       customer_update: { enabled: true, allowed_updates: ['email'] },
     },
   })).id;
-  const portal = await s.billingPortal.sessions.create({ customer: sub.customerId, return_url: `${SITE_URL}/?billing=portal`, configuration, locale: b.lang === 'zh' ? 'zh' : b.lang === 'es' ? 'es' : 'en' });
+  const portal = await s.billingPortal.sessions.create({ customer: sub.customerId, return_url: `${SITE_URL}/?billing=portal`, configuration, locale: b.lang === 'zh' ? 'zh' : b.lang === 'es' ? 'es' : b.lang === 'pt' ? 'pt-BR' : 'en' });
   return NextResponse.json({ url: portal.url });
 }

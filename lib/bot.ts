@@ -1,10 +1,10 @@
-import { Chart, CalEvent, scoreDay, scoreMoment, readEvent, categorize, Category, STEM, BRANCH, ELEMENT_NAME } from './engine';
+import { Chart, CalEvent, scoreDay, scoreMoment, readEvent, categorize, Category, STEM, BRANCH, ELEMENT_NAME, reasonText } from './engine';
 import { Lang, T, almanac } from './i18n';
 import { fengshuiContext, Sex } from './fengshui';
 
 const dayKey = (d: Date) => d.toDateString();
-const fmtDay = (d: Date, lang: Lang) => d.toLocaleDateString((lang === 'zh' ? 'zh-CN' : lang === 'es' ? 'es-ES' : 'en-US'), { weekday: 'short', month: 'short', day: 'numeric' });
-const fmtHour = (h: number, lang: Lang) => new Date(2000, 0, 1, h).toLocaleTimeString((lang === 'zh' ? 'zh-CN' : lang === 'es' ? 'es-ES' : 'en-US'), { hour: 'numeric', minute: '2-digit' });
+const fmtDay = (d: Date, lang: Lang) => d.toLocaleDateString((lang === 'zh' ? 'zh-CN' : lang === 'es' ? 'es-ES' : lang === 'pt' ? 'pt-BR' : 'en-US'), { weekday: 'short', month: 'short', day: 'numeric' });
+const fmtHour = (h: number, lang: Lang) => new Date(2000, 0, 1, h).toLocaleTimeString((lang === 'zh' ? 'zh-CN' : lang === 'es' ? 'es-ES' : lang === 'pt' ? 'pt-BR' : 'en-US'), { hour: 'numeric', minute: '2-digit' });
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 const localIso = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -52,7 +52,7 @@ export function targetOffsets(question: string, now = new Date()): number[] {
 export function buildContext(chart: Chart, events: CalEvent[], question: string, lang: Lang, fs?: { birthYear: number; sex?: Sex }) {
   const category: Category = categorize(question);
   const now = new Date();
-  const tr = (r: { en: string; zh: string; es?: string }) => (lang === 'zh' ? r.zh : lang === 'es' ? r.es ?? r.en : r.en);
+  const tr = (r: { en: string; zh: string; es?: string; pt?: string }) => (lang === 'zh' ? r.zh : lang === 'pt' ? r.pt ?? r.en : lang === 'es' ? r.es ?? r.en : r.en);
   const vw = (v: 'good' | 'neutral' | 'bad') => T[lang][v];
   const at = (o: number, h = 0, m = 0) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + o, h, m);
   const targets = targetOffsets(question, now);
@@ -92,10 +92,10 @@ export function buildContext(chart: Chart, events: CalEvent[], question: string,
     .slice(0, 40)
     .map((e) => {
       const r = readEvent(chart, e, events);
-      return { title: e.title, start: new Date(e.start).toLocaleString((lang === 'zh' ? 'zh-CN' : lang === 'es' ? 'es-ES' : 'en-US')), verdict: vw(r.verdict), score: r.score, reasons: r.reasons.map((x) => (lang === 'zh' ? x.zh : x.en)), betterTimes: r.alternatives.map((a) => new Date(a.start).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US')) };
+      return { title: e.title, start: new Date(e.start).toLocaleString((lang === 'zh' ? 'zh-CN' : lang === 'es' ? 'es-ES' : lang === 'pt' ? 'pt-BR' : 'en-US')), verdict: vw(r.verdict), score: r.score, reasons: r.reasons.map((x) => (lang === 'zh' ? x.zh : x.en)), betterTimes: r.alternatives.map((a) => new Date(a.start).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US')) };
     });
   return {
-    now: now.toLocaleString((lang === 'zh' ? 'zh-CN' : lang === 'es' ? 'es-ES' : 'en-US')),
+    now: now.toLocaleString((lang === 'zh' ? 'zh-CN' : lang === 'es' ? 'es-ES' : lang === 'pt' ? 'pt-BR' : 'en-US')),
     activityScored: category, // 'general' means no specific activity was recognized; slots still carry the full day/hour reading
     chart: {
       pillars: chart.pillars.map((p) => `${p.label}: ${p.stem}${p.branch} (${STEM[p.stem].pinyin} ${BRANCH[p.branch].pinyin})`),
@@ -140,19 +140,19 @@ export function fallbackAnswer(chart: Chart, question: string, lang: Lang): stri
     let h = Number(hm[1]);
     if (/pm|下午|晚上/.test(q) && h < 12) h += 12;
     const m = scoreMoment(chart, new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, 0), category);
-    lines.push(`${fmtHour(h, lang)} → ${t[m.verdict]} (${m.score}). ${m.reasons.slice(0, 2).map((r) => (lang === 'zh' ? r.zh : lang === 'es' ? r.es : r.en)).join(' ')}`);
+    lines.push(`${fmtHour(h, lang)} → ${t[m.verdict]} (${m.score}). ${m.reasons.slice(0, 2).map((r) => reasonText(r, lang)).join(' ')}`);
   }
   const best = [7, 9, 11, 13, 15, 17, 19]
     .map((h) => ({ h, m: scoreMoment(chart, new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, 30), category) }))
     .sort((a, b) => b.m.score - a.m.score).slice(0, 2);
-  lines.push(`${lang === 'zh' ? '最佳时段' : lang === 'es' ? 'Mejores horas' : 'Best times'}: ${best.map((b) => `${fmtHour(b.h, lang)}–${fmtHour(b.h + 2, lang)} (${t[b.m.verdict]})`).join(lang === 'zh' ? '，' : ', ')}`);
-  if (day.reasons[0]) lines.push(lang === 'zh' ? day.reasons[0].zh : lang === 'es' ? day.reasons[0].es : day.reasons[0].en);
+  lines.push(`${lang === 'zh' ? '最佳时段' : lang === 'es' ? 'Mejores horas' : lang === 'pt' ? 'Melhores horários' : 'Best times'}: ${best.map((b) => `${fmtHour(b.h, lang)}–${fmtHour(b.h + 2, lang)} (${t[b.m.verdict]})`).join(lang === 'zh' ? '，' : ', ')}`);
+  if (day.reasons[0]) lines.push(reasonText(day.reasons[0], lang));
   if (day.verdict === 'bad') {
     for (let i = 1; i <= 7; i++) {
       const n = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
       const best2 = [9, 11, 13, 15, 17].map((h) => ({ h, m: scoreMoment(chart, new Date(n.getFullYear(), n.getMonth(), n.getDate(), h, 30), category) })).sort((a, b) => b.m.score - a.m.score)[0];
       if (best2.m.verdict === 'good') {
-        lines.push(lang === 'es' ? `Una mejor opción: ${fmtDay(n, lang)} a las ${fmtHour(best2.h, lang)} (${t.good}, ${best2.m.score}).` : lang === 'zh' ? `更好的选择：${fmtDay(n, lang)} ${fmtHour(best2.h, lang)}（${t.good}，${best2.m.score}）。` : `A better option: ${fmtDay(n, lang)} at ${fmtHour(best2.h, lang)} (${t.good}, ${best2.m.score}).`);
+        lines.push(lang === 'pt' ? `Uma opção melhor: ${fmtDay(n, lang)} às ${fmtHour(best2.h, lang)} (${t.good}, ${best2.m.score}).` : lang === 'es' ? `Una mejor opción: ${fmtDay(n, lang)} a las ${fmtHour(best2.h, lang)} (${t.good}, ${best2.m.score}).` : lang === 'zh' ? `更好的选择：${fmtDay(n, lang)} ${fmtHour(best2.h, lang)}（${t.good}，${best2.m.score}）。` : `A better option: ${fmtDay(n, lang)} at ${fmtHour(best2.h, lang)} (${t.good}, ${best2.m.score}).`);
         break;
       }
     }

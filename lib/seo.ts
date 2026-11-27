@@ -4,16 +4,20 @@ import { langPrefix, type L } from './goodDays';
 import { PRICES } from './plans';
 import { FACEBOOK_URL } from './site';
 
+// the home page also exists in Portuguese (/pt); guides and good-days pages are en / zh / es
+type HL = L | 'pt';
+const pre = (lang: HL) => (lang === 'pt' ? '/pt' : langPrefix(lang));
+
 // hreflang + canonical for a path that exists in all three languages
-export function alternates(lang: L, path: string): Metadata['alternates'] {
+export function alternates(lang: HL, path: string): Metadata['alternates'] {
   const p = path === '/' ? '' : path;
   return {
-    canonical: `${langPrefix(lang)}${p}` || '/',
-    languages: { en: p || '/', 'zh-CN': `/zh${p}`, es: `/es${p}`, 'x-default': p || '/' },
+    canonical: `${pre(lang)}${p}` || '/',
+    languages: { en: p || '/', 'zh-CN': `/zh${p}`, es: `/es${p}`, ...(p ? {} : { 'pt-BR': '/pt' }), 'x-default': p || '/' },
   };
 }
 
-export const HOME_META: Record<L, { title: string; description: string; keywords: string[] }> = {
+export const HOME_META: Record<HL, { title: string; description: string; keywords: string[] }> = {
   en: {
     title: 'FateCal: Better timing. Better plans. Powered by BaZi',
     description: 'FateCal reads your BaZi (Four Pillars) chart and your schedule, scores every plan against the Chinese almanac, and suggests a better day or hour. Feng shui directions, flying stars and an AI advisor included.',
@@ -29,25 +33,30 @@ export const HOME_META: Record<L, { title: string; description: string; keywords
     description: 'FateCal lee tu carta BaZi (Cuatro Pilares) y tu agenda, puntúa cada plan según el almanaque chino y sugiere un mejor día u hora. Incluye direcciones de feng shui, estrellas voladoras y un asesor con IA.',
     keywords: ['calendario BaZi', 'Cuatro Pilares del Destino', 'almanaque chino', 'días propicios', 'feng shui'],
   },
+  pt: {
+    title: 'FateCal: Melhor momento. Melhores planos. Com o poder do BaZi',
+    description: 'O FateCal lê seu mapa BaZi (Quatro Pilares) e sua agenda, dá nota a cada plano segundo o almanaque chinês e sugere um dia ou horário melhor. Inclui direções de feng shui, estrelas voadoras e um consultor com IA.',
+    keywords: ['calendário BaZi', 'Quatro Pilares do Destino', 'almanaque chinês', 'dias favoráveis', 'horóscopo chinês', 'feng shui'],
+  },
 };
 
-export function homeMetadata(lang: L, path: string): Metadata {
+export function homeMetadata(lang: HL, path: string): Metadata {
   const m = HOME_META[lang];
   return {
     title: m.title, description: m.description, keywords: m.keywords, alternates: alternates(lang, path),
-    openGraph: { title: m.title, description: m.description, url: `https://fatecal.com${langPrefix(lang) || '/'}`, siteName: lang === 'zh' ? '随身吉历 FateCal' : 'FateCal', type: 'website', locale: lang === 'zh' ? 'zh_CN' : lang === 'es' ? 'es_ES' : 'en_US' },
+    openGraph: { title: m.title, description: m.description, url: `https://fatecal.com${pre(lang) || '/'}`, siteName: lang === 'zh' ? '随身吉历 FateCal' : 'FateCal', type: 'website', locale: lang === 'zh' ? 'zh_CN' : lang === 'es' ? 'es_ES' : lang === 'pt' ? 'pt_BR' : 'en_US' },
   };
 }
 
 // WebApplication + FAQPage structured data for the home page
-export function homeJsonLd(lang: L) {
+export function homeJsonLd(lang: HL) {
   const faq = T[lang].lp.faq as [string, string][];
   const usd = (c: number) => (c / 100).toFixed(2);
   return [
     {
-      '@context': 'https://schema.org', '@type': 'WebApplication', name: 'FateCal', alternateName: '随身吉历', url: `https://fatecal.com${langPrefix(lang) || '/'}`,
+      '@context': 'https://schema.org', '@type': 'WebApplication', name: 'FateCal', alternateName: '随身吉历', url: `https://fatecal.com${pre(lang) || '/'}`,
       sameAs: [FACEBOOK_URL],
-      applicationCategory: 'LifestyleApplication', operatingSystem: 'Any (web browser)', inLanguage: lang === 'zh' ? 'zh-CN' : lang, description: HOME_META[lang].description,
+      applicationCategory: 'LifestyleApplication', operatingSystem: 'Any (web browser)', inLanguage: lang === 'zh' ? 'zh-CN' : lang === 'pt' ? 'pt-BR' : lang, description: HOME_META[lang].description,
       offers: [
         { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'USD' },
         { '@type': 'Offer', name: 'Basic (monthly)', price: usd(PRICES.basic.month.cents), priceCurrency: 'USD' },
@@ -55,7 +64,7 @@ export function homeJsonLd(lang: L) {
       ],
     },
     {
-      '@context': 'https://schema.org', '@type': 'FAQPage', inLanguage: lang === 'zh' ? 'zh-CN' : lang,
+      '@context': 'https://schema.org', '@type': 'FAQPage', inLanguage: lang === 'zh' ? 'zh-CN' : lang === 'pt' ? 'pt-BR' : lang,
       mainEntity: faq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })),
     },
   ];

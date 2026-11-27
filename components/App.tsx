@@ -2,7 +2,7 @@
 
 import { createContext, forwardRef, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-  BirthInput, CalEvent, Category, Chart, computeChart, readEvent, scoreDay, dayActivities, activityName, reasonText, ANIMAL_ES, STEM, BRANCH, ELEMENT_NAME, Element, HIDDEN,
+  BirthInput, CalEvent, Category, Chart, computeChart, readEvent, scoreDay, dayActivities, activityName, reasonText, ANIMAL_ES, ANIMAL_PT, STEM, BRANCH, ELEMENT_NAME, Element, HIDDEN,
 } from '@/lib/engine';
 import { T, Lang, almanac } from '@/lib/i18n';
 import { buildContext, fallbackAnswer, fmtDay, fmtHour } from '@/lib/bot';
@@ -56,9 +56,9 @@ function load<T>(k: string, fallback: T): T {
 function save(k: string, v: unknown) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } }
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
-const tLocale = (lang: Lang) => (lang === 'zh' ? 'zh-CN' : lang === 'es' ? 'es-ES' : 'en-US');
+const tLocale = (lang: Lang) => (lang === 'zh' ? 'zh-CN' : lang === 'es' ? 'es-ES' : lang === 'pt' ? 'pt-BR' : 'en-US');
 // pick the string for the current language
-const L3 = <A,>(lang: Lang, en: A, zh: A, es: A) => (lang === 'zh' ? zh : lang === 'es' ? es : en);
+const L3 = <A,>(lang: Lang, en: A, zh: A, es: A, pt?: A) => (lang === 'zh' ? zh : lang === 'es' ? es : lang === 'pt' ? (pt ?? es) : en);
 const fmtTime = (iso: string, lang: Lang) => new Date(iso).toLocaleTimeString(tLocale(lang), { hour: 'numeric', minute: '2-digit' });
 const pad = (n: number) => String(n).padStart(2, '0');
 const isoLocalDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -83,7 +83,7 @@ export default function App({ initialLang = "en", pathLang }: { initialLang?: La
   const [langPick, setLangPick] = useState<Lang | null>(null);
   useEffect(() => {
     document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang;
-    document.title = lang === 'zh' ? '随身吉历 FateCal：给重要的事，挑个好时间' : lang === 'es' ? 'FateCal: Mejor momento. Mejores planes.' : 'FateCal: Better timing. Better plans. Powered by BaZi';
+    document.title = lang === 'zh' ? '随身吉历 FateCal：给重要的事，挑个好时间' : lang === 'es' ? 'FateCal: Mejor momento. Mejores planes.' : lang === 'pt' ? 'FateCal: Melhor momento. Melhores planos.' : 'FateCal: Better timing. Better plans. Powered by BaZi';
   }, [lang]);
   const setLang = (l: Lang) => { setLangState(l); setLangPick(l); save(K.langPick, l); };
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -228,7 +228,7 @@ export default function App({ initialLang = "en", pathLang }: { initialLang?: La
         setProfile(d.profile); save(K.profile, d.profile);
         if (Array.isArray(d.events)) setManual(d.events);
         if (d.icsUrl && !ics?.url) setIcs({ url: d.icsUrl, events: [] });
-        if ((d.langPick === 'en' || d.langPick === 'zh' || d.langPick === 'es') && !load<Lang | null>(K.langPick, null)) { setLangState(d.langPick); setLangPick(d.langPick); save(K.langPick, d.langPick); }
+        if ((d.langPick === 'en' || d.langPick === 'zh' || d.langPick === 'es' || d.langPick === 'pt') && !load<Lang | null>(K.langPick, null)) { setLangState(d.langPick); setLangPick(d.langPick); save(K.langPick, d.langPick); }
         if (d.mailKey && !mailKey) { save(K.mailKey, d.mailKey); setMailKey(d.mailKey); }
         if (d.gcalKey && !gcalKey) { save(K.gcalKey, d.gcalKey); setGcalKey(d.gcalKey); refreshGcal(d.gcalKey); }
       }
@@ -332,13 +332,13 @@ export default function App({ initialLang = "en", pathLang }: { initialLang?: La
         const alt = r.alternatives[0];
         let body = `${fmtTime(e.start, lang)} · ${r.score} ${t2[r.verdict]}`;
         if (r.verdict !== 'good' && alt && sameDay(new Date(alt.start), new Date(e.start))) body += ` · ${t2.qa.useBetter(fmtTime(alt.start, lang), alt.score)}`;
-        list.push({ id: hashId(`${e.id}@${e.start}`), title: L3(lang, `In ${rem.before} min: ${e.title}`, `${rem.before} 分钟后：${e.title}`, `En ${rem.before} min: ${e.title}`), body, at: new Date(s - rem.before * 60000) });
+        list.push({ id: hashId(`${e.id}@${e.start}`), title: L3(lang, `In ${rem.before} min: ${e.title}`, `${rem.before} 分钟后：${e.title}`, `En ${rem.before} min: ${e.title}`, `Em ${rem.before} min: ${e.title}`), body, at: new Date(s - rem.before * 60000) });
       }
       if (rem.morning) for (let i = 0; i < 7; i++) {
         const d = new Date(); d.setDate(d.getDate() + i); d.setHours(8, 0, 0, 0);
         const sc = scoreDay(chart, d), best = sc.bestHours[0];
-        list.push({ id: hashId(`am:${dateKey(d)}`), title: L3(lang, `Today: ${sc.score} · ${t2[sc.verdict]}`, `今天 ${sc.score} 分 · ${t2[sc.verdict]}`, `Hoy: ${sc.score} · ${t2[sc.verdict]}`),
-          body: `${t2.verdictLine[sc.verdict].replace('{w}', L3(lang, 'Today', '今天', 'Hoy'))}${best ? ` ${t2.v2.window(fmtHour(best.start, lang), fmtHour(best.start + 2, lang), L3(lang, 'today', '今天', 'hoy'))}` : ''}`, at: d });
+        list.push({ id: hashId(`am:${dateKey(d)}`), title: L3(lang, `Today: ${sc.score} · ${t2[sc.verdict]}`, `今天 ${sc.score} 分 · ${t2[sc.verdict]}`, `Hoy: ${sc.score} · ${t2[sc.verdict]}`, `Hoje: ${sc.score} · ${t2[sc.verdict]}`),
+          body: `${t2.verdictLine[sc.verdict].replace('{w}', L3(lang, 'Today', '今天', 'Hoy', 'Hoje'))}${best ? ` ${t2.v2.window(fmtHour(best.start, lang), fmtHour(best.start + 2, lang), L3(lang, 'today', '今天', 'hoy', 'hoje'))}` : ''}`, at: d });
       }
       setReminders(list);
     }, 1500);
@@ -493,7 +493,7 @@ function Logo({ big = false, lang }: { big?: boolean; lang?: Lang }) {
 }
 
 // Language picker, top right on every screen: 🌐 + the current language + ▾ (native menu, so it works well on phones)
-const LANGS: { id: Lang; name: string }[] = [{ id: 'en', name: 'English' }, { id: 'zh', name: '中文' }, { id: 'es', name: 'Español' }];
+const LANGS: { id: Lang; name: string }[] = [{ id: 'en', name: 'English' }, { id: 'zh', name: '中文' }, { id: 'es', name: 'Español' }, { id: 'pt', name: 'Português' }];
 function LangMenu({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void }) {
   return (
     <label className="langpick">
@@ -627,7 +627,7 @@ function SignUp({ lang, providers }: { lang: Lang; providers: string[] }) {
   const [mode, setMode] = useState<'pick' | 'email' | 'phone'>('pick');
   const [step, setStep] = useState<'enter' | 'code'>('enter');
   const [email, setEmail] = useState('');
-  const [dial, setDial] = useState(lang === 'zh' ? '+86' : lang === 'es' ? '+52' : '+1');
+  const [dial, setDial] = useState(lang === 'zh' ? '+86' : lang === 'es' ? '+52' : lang === 'pt' ? '+55' : '+1');
   const [num, setNum] = useState('');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -713,7 +713,7 @@ function SignUp({ lang, providers }: { lang: Lang; providers: string[] }) {
         </form>
       )}
       {err && <p className="danger small" role="alert">{err}</p>}
-      <p className="tiny muted">{t.agree} <a href="/terms">{L3(lang, 'Terms', '服务条款', 'Términos')}</a> {t.and} <a href="/privacy">{L3(lang, 'Privacy Policy', '隐私政策', 'Política de privacidad')}</a>.</p>
+      <p className="tiny muted">{t.agree} <a href="/terms">{L3(lang, 'Terms', '服务条款', 'Términos', 'Termos')}</a> {t.and} <a href="/privacy">{L3(lang, 'Privacy Policy', '隐私政策', 'Política de privacidad', 'Política de privacidade')}</a>.</p>
     </section>
   );
 }
@@ -732,7 +732,7 @@ function VerdictTag({ v, lang }: { v: 'good' | 'neutral' | 'bad'; lang: Lang }) 
 }
 
 const CAT_EMOJI: Partial<Record<Category, string>> = { meeting: '🤝', signing: '✍️', travel: '✈️', opening: '🚀', money: '💸', moving: '🏠', romance: '💞', medical: '🩺', haircut: '✂️', study: '📚', build: '🛠️', wedding: '💍', cleaning: '🧹' };
-const shortHour = (h: number, lang: Lang) => (lang === 'zh' ? `${h % 24}点` : lang === 'es' ? `${h % 24}h` : `${((h + 11) % 12) + 1}${h % 24 < 12 ? 'a' : 'p'}`);
+const shortHour = (h: number, lang: Lang) => (lang === 'zh' ? `${h % 24}点` : lang === 'es' || lang === 'pt' ? `${h % 24}h` : `${((h + 11) % 12) + 1}${h % 24 < 12 ? 'a' : 'p'}`);
 
 function ScoreRing({ score, label }: { score: number; label: string }) {
   const r = 46, c = 2 * Math.PI * r;
@@ -786,7 +786,7 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
   const hr = new Date().getHours();
   const hi = v.hi[hr < 12 ? 0 : hr < 18 ? 1 : 2];
   const gz = summary.ganZhi;
-  const gzName = lang === 'zh' ? `${ELEMENT_NAME[STEM[gz[0]].el].zh}${BRANCH[gz[1]].zh}日` : lang === 'es' ? `Día ${ANIMAL_ES[BRANCH[gz[1]].animal]} de ${ELEMENT_NAME[STEM[gz[0]].el].es} · ${STEM[gz[0]].pinyin}-${BRANCH[gz[1]].pinyin}` : `${ELEMENT_NAME[STEM[gz[0]].el].en} ${BRANCH[gz[1]].animal} day · ${STEM[gz[0]].pinyin}-${BRANCH[gz[1]].pinyin}`;
+  const gzName = lang === 'zh' ? `${ELEMENT_NAME[STEM[gz[0]].el].zh}${BRANCH[gz[1]].zh}日` : lang === 'es' ? `Día ${ANIMAL_ES[BRANCH[gz[1]].animal]} de ${ELEMENT_NAME[STEM[gz[0]].el].es} · ${STEM[gz[0]].pinyin}-${BRANCH[gz[1]].pinyin}` : lang === 'pt' ? `Dia ${ANIMAL_PT[BRANCH[gz[1]].animal]} de ${ELEMENT_NAME[STEM[gz[0]].el].pt} · ${STEM[gz[0]].pinyin}-${BRANCH[gz[1]].pinyin}` : `${ELEMENT_NAME[STEM[gz[0]].el].en} ${BRANCH[gz[1]].animal} day · ${STEM[gz[0]].pinyin}-${BRANCH[gz[1]].pinyin}`;
   const dateStr = day.toLocaleDateString(tLocale(lang), { month: lang === 'zh' ? 'long' : 'short', day: 'numeric' });
   const best = summary.bestHours[0];
   const hs = summary.hours.map((h) => h.score);
@@ -809,7 +809,7 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
         <button className="icon" onClick={() => shift(1)} aria-label={t.nextDay}>›</button>
       </div>
 
-      <section key={day.toDateString()} className={`herocard tappable${slide ? ` slide-${slide}` : ''}`} role="button" tabIndex={0} aria-label={L3(lang, "Open today's life tips", '打开今日生活提示', 'Abrir consejos del día')}
+      <section key={day.toDateString()} className={`herocard tappable${slide ? ` slide-${slide}` : ''}`} role="button" tabIndex={0} aria-label={L3(lang, "Open today's life tips", '打开今日生活提示', 'Abrir consejos del día', 'Abrir dicas do dia')}
         onClick={(e) => { if (!(e.target as HTMLElement).closest('button, a')) setTips(true); }} onKeyDown={(e) => { if (e.key === 'Enter') setTips(true); }}>
         <ScoreRing score={summary.score} label={v.scoreOf(rel.word)} />
         <div className="grow">
@@ -817,13 +817,13 @@ function Today({ lang, chart, events, manual, setManual, name, onMove, onRemove 
           <h2>{t.verdictLine[summary.verdict].replace('{w}', rel.word)}</h2>
           {best && <p>{v.window(fmtHour(best.start, lang), fmtHour(best.start + 2, lang), rel.word)}</p>}
           <div className="row gap" style={{ flexWrap: 'wrap' }}>
-            <button className="tipsbtn" onClick={() => setTips(true)}>✨ {L3(lang, rel.word === 'Today' ? "Today's life tips" : `Life tips for ${rel.word.toLowerCase()}`, rel.word === '今天' ? '今日生活提示' : `${rel.word}生活提示`, `Consejos de ${rel.word.toLowerCase()}`)} ›</button>
+            <button className="tipsbtn" onClick={() => setTips(true)}>✨ {L3(lang, rel.word === 'Today' ? "Today's life tips" : `Life tips for ${rel.word.toLowerCase()}`, rel.word === '今天' ? '今日生活提示' : `${rel.word}生活提示`, `Consejos de ${rel.word.toLowerCase()}`, `Dicas para ${rel.word.toLowerCase()}`)} ›</button>
             <button className="link light" onClick={() => setTrad(!trad)} aria-expanded={trad}>{trad ? t.hideAlmanac : t.showAlmanac}</button>
           </div>
           {trad && (
             <div className="trad">
-              <p><b>{L3(lang, 'Almanac yi', '宜', 'Almanaque: sí')}:</b> {summary.yi.map((w) => almanac(w, lang)).join(sep)}</p>
-              <p><b>{L3(lang, 'Almanac ji', '忌', 'Almanaque: no')}:</b> {summary.ji.map((w) => almanac(w, lang)).join(sep)}</p>
+              <p><b>{L3(lang, 'Almanac yi', '宜', 'Almanaque: sí', 'Almanaque: sim')}:</b> {summary.yi.map((w) => almanac(w, lang)).join(sep)}</p>
+              <p><b>{L3(lang, 'Almanac ji', '忌', 'Almanaque: no', 'Almanaque: não')}:</b> {summary.ji.map((w) => almanac(w, lang)).join(sep)}</p>
             </div>
           )}
         </div>
@@ -909,7 +909,7 @@ function MonthCal({ lang, chart, events, day, setDay }: { lang: Lang; chart: Cha
     return c;
   }, [events, y, m]);
   const today = new Date();
-  const week = L3(lang, ['S', 'M', 'T', 'W', 'T', 'F', 'S'], ['日', '一', '二', '三', '四', '五', '六'], ['D', 'L', 'M', 'X', 'J', 'V', 'S']);
+  const week = L3(lang, ['S', 'M', 'T', 'W', 'T', 'F', 'S'], ['日', '一', '二', '三', '四', '五', '六'], ['D', 'L', 'M', 'X', 'J', 'V', 'S'], ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']);
   const cells: (number | null)[] = [...Array(first.getDay()).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
   const title = first.toLocaleDateString(tLocale(lang), { year: 'numeric', month: 'long' });
   return (
@@ -968,7 +968,7 @@ function relDay(day: Date, lang: Lang): { label: string; word: string } {
     const wd = lang === 'zh' ? `周${'日一二三四五六'[day.getDay()]}` : day.toLocaleDateString(tLocale(lang), { weekday: 'long' });
     label = weeks === 0 ? r.thisW(wd) : weeks === 1 ? r.nextW(wd) : weeks === -1 ? r.lastW(wd) : '';
   }
-  const word = label ? r.word(label) : L3(lang, 'this day', '这天', 'este día');
+  const word = label ? r.word(label) : L3(lang, 'this day', '这天', 'este día', 'este dia');
   return { label, word };
 }
 
@@ -982,7 +982,7 @@ function clearAfterSend(sent: string, set: (f: (cur: string) => string) => void)
 }
 
 function alertUpdate(lang: Lang) {
-  window.alert(L3(lang, 'Photos need the latest app version. Update FateCal in TestFlight, then try again.', '拍照功能需要最新版 App。请在 TestFlight 里更新随身吉历后再试。', 'Las fotos necesitan la última versión. Actualiza FateCal en TestFlight y vuelve a intentarlo.'));
+  window.alert(L3(lang, 'Photos need the latest app version. Update FateCal in TestFlight, then try again.', '拍照功能需要最新版 App。请在 TestFlight 里更新随身吉历后再试。', 'Las fotos necesitan la última versión. Actualiza FateCal en TestFlight y vuelve a intentarlo.', 'As fotos precisam da versão mais nova do app. Atualize o FateCal no TestFlight e tente de novo.'));
 }
 
 // 今日生活提示: what today means for your chart, lucky directions, do / don't, and simple remedies
@@ -996,25 +996,25 @@ function TipsSheet({ lang, chart, day, word, summary, acts, onClose }: { lang: L
     <div className="sheet-bg" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="sheet tips" role="dialog" aria-modal="true" aria-labelledby="tips-h">
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 id="tips-h">✨ {L3(lang, `Life tips · ${word}`, word === '今天' ? '今日生活提示' : `${word}生活提示`, `Consejos · ${word}`)}</h2>
-          <button className="icon sm" onClick={onClose} aria-label={L3(lang, 'Close', '关闭', 'Cerrar')}>✕</button>
+          <h2 id="tips-h">✨ {L3(lang, `Life tips · ${word}`, word === '今天' ? '今日生活提示' : `${word}生活提示`, `Consejos · ${word}`, `Dicas · ${word}`)}</h2>
+          <button className="icon sm" onClick={onClose} aria-label={L3(lang, 'Close', '关闭', 'Cerrar', 'Fechar')}>✕</button>
         </div>
         <p className="tips-lead"><span className="han">{d.dayGz}</span> · {summary.score} {t[summary.verdict]}</p>
-        <section><h3>🔮 {L3(lang, 'What kind of day', `${word}是什么日子`, 'Qué tipo de día')}</h3><p>{d.kind}</p>{d.branchNote && <p>{d.branchNote}</p>}</section>
-        <section><h3>🧭 {L3(lang, 'Lucky directions', '吉利方位', 'Direcciones de suerte')}</h3>
+        <section><h3>🔮 {L3(lang, 'What kind of day', `${word}是什么日子`, 'Qué tipo de día', 'Que tipo de dia')}</h3><p>{d.kind}</p>{d.branchNote && <p>{d.branchNote}</p>}</section>
+        <section><h3>🧭 {L3(lang, 'Lucky directions', '吉利方位', 'Direcciones de suerte', 'Direções de sorte')}</h3>
           <div className="tipdirs">{d.lucky.map((x) => <div key={x.label}><b>{x.dir}</b><span>{x.label}</span></div>)}</div>
-          <p className="small">⚠️ {L3(lang, `Avoid starting important things facing ${d.avoidDir} (sha). People born in the Year of the ${d.clashAnimal} should keep a low profile ${word === 'Today' ? 'today' : word.toLowerCase()}.`, `避开${d.avoidDir}（${word === '今天' ? '今日' : word}煞方）。属${d.clashAnimal}的人${word}宜低调。`, `Evita el ${d.avoidDir} (sha). Los nacidos en el año del ${d.clashAnimal} deben ir con calma ${word === 'Hoy' ? 'hoy' : word.toLowerCase()}.`)}</p>
+          <p className="small">⚠️ {L3(lang, `Avoid starting important things facing ${d.avoidDir} (sha). People born in the Year of the ${d.clashAnimal} should keep a low profile ${word === 'Today' ? 'today' : word.toLowerCase()}.`, `避开${d.avoidDir}（${word === '今天' ? '今日' : word}煞方）。属${d.clashAnimal}的人${word}宜低调。`, `Evita el ${d.avoidDir} (sha). Los nacidos en el año del ${d.clashAnimal} deben ir con calma ${word === 'Hoy' ? 'hoy' : word.toLowerCase()}.`, `Evite o ${d.avoidDir} (sha). Quem nasceu no ano do ${d.clashAnimal} deve ir com calma ${word === 'Hoje' ? 'hoje' : word.toLowerCase()}.`)}</p>
         </section>
-        <section><h3>🗺️ {L3(lang, 'Directions on a map', '方位地图', 'Direcciones en el mapa')}</h3>
-          <DirectionMap lang={lang} lucky={d.lucky.map((x) => ({ raw: x.raw, label: x.label.replace(/\s*\(.*\)/, ''), dir: x.dir }))} sha={d.shaRaw} shaLabel={L3(lang, `Sha · avoid ${d.avoidDir}`, `煞方 · 避开${d.avoidDir}`, `Sha · evita el ${d.avoidDir}`)} />
+        <section><h3>🗺️ {L3(lang, 'Directions on a map', '方位地图', 'Direcciones en el mapa', 'Direções no mapa')}</h3>
+          <DirectionMap lang={lang} lucky={d.lucky.map((x) => ({ raw: x.raw, label: x.label.replace(/\s*\(.*\)/, ''), dir: x.dir }))} sha={d.shaRaw} shaLabel={L3(lang, `Sha · avoid ${d.avoidDir}`, `煞方 · 避开${d.avoidDir}`, `Sha · evita el ${d.avoidDir}`, `Sha · evite o ${d.avoidDir}`)} />
         </section>
-        <section><h3>✅ {L3(lang, 'Good for', '适合做', 'Bueno para')}</h3><p>{acts.good.length ? acts.good.slice(0, 6).map((a) => `${CAT_EMOJI[a.cat]} ${activityName(a.cat, lang)}`).join(sep) : t.routineOnly}</p>
-          {best && <p className="small">⏰ {L3(lang, `Best hours: ${best}`, `最顺时段：${best}`, `Mejores horas: ${best}`)}</p>}</section>
-        <section><h3>🚫 {L3(lang, 'Better not', '不适合做', 'Mejor evitar')}</h3><p>{acts.avoid.length ? acts.avoid.slice(0, 6).map((a) => `${CAT_EMOJI[a.cat]} ${activityName(a.cat, lang)}`).join(sep) : t.nothingMajor}</p></section>
-        <section><h3>🎨 {L3(lang, 'Your luck boosters', word === '今天' ? '今日开运' : `${word}开运`, 'Para tu suerte')}</h3>
-          <p>{L3(lang, 'Lucky colors: ', '幸运色：', 'Colores: ')}<b>{d.colors}</b></p><p>{L3(lang, 'Lucky numbers: ', '幸运数字：', 'Números: ')}<b>{d.numbers}</b></p></section>
-        <section><h3>🪬 {L3(lang, 'If things feel off, try', '不顺时怎么化解', 'Si algo no fluye')}</h3><ul>{d.remedies.map((r) => <li key={r}>{r}</li>)}</ul></section>
-        <p className="tiny muted">{L3(lang, 'Traditional Chinese almanac and BaZi for reference.', '依据传统黄历与八字，供参考。', 'Basado en el almanaque chino y BaZi, como referencia.')}</p>
+        <section><h3>✅ {L3(lang, 'Good for', '适合做', 'Bueno para', 'Bom para')}</h3><p>{acts.good.length ? acts.good.slice(0, 6).map((a) => `${CAT_EMOJI[a.cat]} ${activityName(a.cat, lang)}`).join(sep) : t.routineOnly}</p>
+          {best && <p className="small">⏰ {L3(lang, `Best hours: ${best}`, `最顺时段：${best}`, `Mejores horas: ${best}`, `Melhores horários: ${best}`)}</p>}</section>
+        <section><h3>🚫 {L3(lang, 'Better not', '不适合做', 'Mejor evitar', 'Melhor evitar')}</h3><p>{acts.avoid.length ? acts.avoid.slice(0, 6).map((a) => `${CAT_EMOJI[a.cat]} ${activityName(a.cat, lang)}`).join(sep) : t.nothingMajor}</p></section>
+        <section><h3>🎨 {L3(lang, 'Your luck boosters', word === '今天' ? '今日开运' : `${word}开运`, 'Para tu suerte', 'Para a sua sorte')}</h3>
+          <p>{L3(lang, 'Lucky colors: ', '幸运色：', 'Colores: ', 'Cores: ')}<b>{d.colors}</b></p><p>{L3(lang, 'Lucky numbers: ', '幸运数字：', 'Números: ', 'Números: ')}<b>{d.numbers}</b></p></section>
+        <section><h3>🪬 {L3(lang, 'If things feel off, try', '不顺时怎么化解', 'Si algo no fluye', 'Se algo não flui')}</h3><ul>{d.remedies.map((r) => <li key={r}>{r}</li>)}</ul></section>
+        <p className="tiny muted">{L3(lang, 'Traditional Chinese almanac and BaZi for reference.', '依据传统黄历与八字，供参考。', 'Basado en el almanaque chino y BaZi, como referencia.', 'Baseado no almanaque chinês e no BaZi, como referência.')}</p>
       </div>
     </div>
   );
@@ -1185,7 +1185,7 @@ function AddEvent({ lang, day, onSave, onCancel }: { lang: Lang; day: Date; onSa
             <button type="button" key={k} className={kind === k ? 'on' : ''} onClick={() => { setKind(k); setTitle(v.quickTitle[k]); }}>{em} {k}</button>
           ))}
         </div>
-        <label>{t.title}<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={L3(lang, 'Partnership talk with Mr. Zhang', '和张总谈合作', 'Reunión con la Sra. García')} required autoFocus /></label>
+        <label>{t.title}<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={L3(lang, 'Partnership talk with Mr. Zhang', '和张总谈合作', 'Reunión con la Sra. García', 'Reunião com a Sra. Silva')} required autoFocus /></label>
         <label>{t.date}<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
         <div className="row gap">
           <label className="grow">{t.from}<input type="time" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
@@ -1217,22 +1217,24 @@ function EventCard({ lang, chart, ev, all, onMove, onDelete }: { lang: Lang; cha
   // lead with what is specific to this event: the almanac for its activity, then its hour, then the day
   const rank = (x: { scope: string }) => (x.scope.startsWith('almanac') ? 0 : x.scope === 'hour' ? 1 : 2);
   const tops = [...r.reasons].sort((a, b) => rank(a) - rank(b) || Math.abs(b.delta) - Math.abs(a.delta)).slice(0, 2);
-  const actLabel = r.category === 'general' ? '' : L3(lang, `For ${activityName(r.category, lang)}: `, `${activityName(r.category, lang)}：`, `Para ${activityName(r.category, lang)}: `);
+  const actLabel = r.category === 'general' ? '' : L3(lang, `For ${activityName(r.category, lang)}: `, `${activityName(r.category, lang)}：`, `Para ${activityName(r.category, lang)}: `, `Para ${activityName(r.category, lang)}: `);
   const alt = r.alternatives[0];
   const sameD = alt ? sameDay(new Date(alt.start), new Date(ev.start)) : false;
   const altLabel = alt ? `${sameD ? '' : fmtDay(new Date(alt.start), lang) + ' '}${fmtTime(alt.start, lang)}` : '';
   const note = alt
     ? lang === 'es'
       ? `¡Hola! ¿Podríamos mover «${ev.title}» del ${fmtDay(new Date(ev.start), lang)} ${fmtTime(ev.start, lang)} al ${fmtDay(new Date(alt.start), lang)} ${fmtTime(alt.start, lang)}? ¡Gracias!`
+      : lang === 'pt'
+      ? `Olá! Podemos mudar «${ev.title}» de ${fmtDay(new Date(ev.start), lang)} ${fmtTime(ev.start, lang)} para ${fmtDay(new Date(alt.start), lang)} ${fmtTime(alt.start, lang)}? Obrigado!`
       : lang === 'zh'
       ? `您好，「${ev.title}」原定 ${fmtDay(new Date(ev.start), lang)} ${fmtTime(ev.start, lang)}，可否改到 ${fmtDay(new Date(alt.start), lang)} ${fmtTime(alt.start, lang)}？谢谢！`
       : `Hi! Could we move "${ev.title}" from ${fmtDay(new Date(ev.start), lang)} ${fmtTime(ev.start, lang)} to ${fmtDay(new Date(alt.start), lang)} ${fmtTime(alt.start, lang)}? Thanks!`
     : '';
   const st = new Date(ev.start);
   const tb = ev.allDay
-    ? { a: L3(lang, 'All', '全天', 'Todo'), b: L3(lang, 'day', '', 'el día') }
+    ? { a: L3(lang, 'All', '全天', 'Todo', 'Tudo'), b: L3(lang, 'day', '', 'el día', 'o dia') }
     : lang !== 'en'
-      ? { a: `${st.getHours()}:${pad(st.getMinutes())}`, b: lang === 'es' ? (st.getHours() < 12 ? 'mañana' : st.getHours() < 20 ? 'tarde' : 'noche') : st.getHours() < 12 ? '上午' : '下午' }
+      ? { a: `${st.getHours()}:${pad(st.getMinutes())}`, b: lang === 'es' ? (st.getHours() < 12 ? 'mañana' : st.getHours() < 20 ? 'tarde' : 'noche') : lang === 'pt' ? (st.getHours() < 12 ? 'manhã' : st.getHours() < 18 ? 'tarde' : 'noite') : st.getHours() < 12 ? '上午' : '下午' }
       : { a: `${((st.getHours() + 11) % 12) + 1}:${pad(st.getMinutes())}`, b: st.getHours() < 12 ? 'AM' : 'PM' };
   const full = useBill().info.limits.fullReasons;
   const showMove = full && !ev.allDay && !!alt && r.verdict !== 'good';
@@ -1269,7 +1271,7 @@ function EventCard({ lang, chart, ev, all, onMove, onDelete }: { lang: Lang; cha
           <ul>
             {r.reasons.map((x, i) => <li key={i}><span className={x.delta >= 0 ? 'plus' : 'minus'}>{x.delta >= 0 ? '+' : ''}{x.delta}</span> {reasonText(x, lang)}</li>)}
           </ul>
-          <p className="tiny" style={{ marginTop: 6 }}>{lang === 'zh' ? `综合 ${r.score} 分 · 日 ${r.dayGanZhi} · 时 ${r.hourGanZhi}` : lang === 'es' ? `Puntuación ${r.score} · día ${STEM[r.dayGanZhi[0]].pinyin}-${BRANCH[r.dayGanZhi[1]].pinyin} · hora del ${ANIMAL_ES[BRANCH[r.hourGanZhi[1]].animal]}` : `Score ${r.score} · ${STEM[r.dayGanZhi[0]].pinyin}-${BRANCH[r.dayGanZhi[1]].pinyin} day · ${BRANCH[r.hourGanZhi[1]].animal} hour`}</p>
+          <p className="tiny" style={{ marginTop: 6 }}>{lang === 'zh' ? `综合 ${r.score} 分 · 日 ${r.dayGanZhi} · 时 ${r.hourGanZhi}` : lang === 'es' ? `Puntuación ${r.score} · día ${STEM[r.dayGanZhi[0]].pinyin}-${BRANCH[r.dayGanZhi[1]].pinyin} · hora del ${ANIMAL_ES[BRANCH[r.hourGanZhi[1]].animal]}` : lang === 'pt' ? `Nota ${r.score} · dia ${STEM[r.dayGanZhi[0]].pinyin}-${BRANCH[r.dayGanZhi[1]].pinyin} · hora do ${ANIMAL_PT[BRANCH[r.hourGanZhi[1]].animal]}` : `Score ${r.score} · ${STEM[r.dayGanZhi[0]].pinyin}-${BRANCH[r.dayGanZhi[1]].pinyin} day · ${BRANCH[r.hourGanZhi[1]].animal} hour`}</p>
         </div>
       )}
     </article>
@@ -1342,7 +1344,7 @@ function Ask({ lang, chart, events, profile, seed, clearSeed }: { lang: Lang; ch
     const pic = given === undefined ? photo : given;
     if ((!question.trim() && !pic) || busy) return;
     const history = msgs;
-    setMsgs([...history, { role: 'user', text: question || L3(lang, 'What about this photo?', '帮我看看这张图', '¿Qué opinas de esta foto?'), image: pic?.preview }, { role: 'assistant', text: '' }]);
+    setMsgs([...history, { role: 'user', text: question || L3(lang, 'What about this photo?', '帮我看看这张图', '¿Qué opinas de esta foto?', 'O que você acha desta foto?'), image: pic?.preview }, { role: 'assistant', text: '' }]);
     clearAfterSend(question, setQ);
     setPhoto(null);
     setBusy(true);
@@ -1392,7 +1394,7 @@ function Ask({ lang, chart, events, profile, seed, clearSeed }: { lang: Lang; ch
       <div>
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
           <h1>{t.askTitle}</h1>
-          {msgs.length > 0 && !busy && <button className="link small" onClick={() => setMsgs([])}>{L3(lang, 'New chat', '清空对话', 'Nueva conversación')}</button>}
+          {msgs.length > 0 && !busy && <button className="link small" onClick={() => setMsgs([])}>{L3(lang, 'New chat', '清空对话', 'Nueva conversación', 'Nova conversa')}</button>}
         </div>
         <p className="muted">{t.askHint}</p>
       </div>
@@ -1540,13 +1542,13 @@ function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Ch
               <div className="small"><b>{f.goodDirs}</b></div>
               <ul className="reasons">
                 {kua.dirs.filter((d) => STAR8[d.star].good).map((d) => (
-                  <li key={d.star}><span className="plus">{dn(d.dir)}</span> {STAR8[d.star][lang]}: {L3(lang, STAR8[d.star].useEn, STAR8[d.star].useZh, STAR8[d.star].useEs)}</li>
+                  <li key={d.star}><span className="plus">{dn(d.dir)}</span> {STAR8[d.star][lang]}: {L3(lang, STAR8[d.star].useEn, STAR8[d.star].useZh, STAR8[d.star].useEs, STAR8[d.star].usePt)}</li>
                 ))}
               </ul>
               <div className="small"><b>{f.badDirs}</b></div>
               <ul className="reasons">
                 {kua.dirs.filter((d) => !STAR8[d.star].good).map((d) => (
-                  <li key={d.star}><span className="minus">{dn(d.dir)}</span> {STAR8[d.star][lang]}: {L3(lang, STAR8[d.star].useEn, STAR8[d.star].useZh, STAR8[d.star].useEs)}</li>
+                  <li key={d.star}><span className="minus">{dn(d.dir)}</span> {STAR8[d.star][lang]}: {L3(lang, STAR8[d.star].useEn, STAR8[d.star].useZh, STAR8[d.star].useEs, STAR8[d.star].usePt)}</li>
                 ))}
               </ul>
               <p className="small"><b>{f.elDirs}:</b> {DIRS.filter((d) => chart.favorable.includes(DIR_ELEMENT[d])).map((d) => `${dn(d)} (${el(DIR_ELEMENT[d])})`).join(zh ? '、' : ', ')}</p>
@@ -1575,7 +1577,7 @@ function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Ch
             const st = FLY[stars[g]];
             return (
               <button key={g} role="gridcell" className={`fscell ${st.tone} ${cell === g ? 'sel' : ''}`} onClick={() => setCell(cell === g ? null : g)} aria-pressed={cell === g}
-                aria-label={`${g === 'C' ? f.center : dn(g)}: ${st[lang]}, ${L3(lang, st.en2, st.zh2, st.es2)}`}>
+                aria-label={`${g === 'C' ? f.center : dn(g)}: ${st[lang]}, ${L3(lang, st.en2, st.zh2, st.es2, st.pt2)}`}>
                 <span className="tiny">{g === 'C' ? f.center : dn(g)}</span>
                 <b className="fsemoji" aria-hidden="true">{FLY_PLAIN[stars[g]].emoji}</b>
                 <span className="fslabel">{FLY_PLAIN[stars[g]][lang]}</span>
@@ -1586,8 +1588,8 @@ function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Ch
         </div>
         {c && (
           <div className="suggest">
-            <p className="small"><b>{cell === 'C' ? f.center : dn(cell as Dir)} · {FLY_PLAIN[stars[cell!]].emoji} {FLY_PLAIN[stars[cell!]][lang]}</b>: {L3(lang, c.en2, c.zh2, c.es2)}</p>
-            <p className="small">{L3(lang, c.fixEn, c.fixZh, c.fixEs)}</p>
+            <p className="small"><b>{cell === 'C' ? f.center : dn(cell as Dir)} · {FLY_PLAIN[stars[cell!]].emoji} {FLY_PLAIN[stars[cell!]][lang]}</b>: {L3(lang, c.en2, c.zh2, c.es2, c.pt2)}</p>
+            <p className="small">{L3(lang, c.fixEn, c.fixZh, c.fixEs, c.fixPt)}</p>
           </div>
         )}
         <h3 className="fslist-h">{f.listH}</h3>
@@ -1597,7 +1599,7 @@ function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Ch
             return (
               <li key={g} className={st.tone}>
                 <div className="row between"><b>{pl.emoji} {g === 'C' ? f.center : dn(g)} · {pl[lang]}</b><span className={`fstag ${st.tone}`}>{st.tone === 'bad' ? f.calm : f.good}</span></div>
-                <p className="small">{L3(lang, st.fixEn, st.fixZh, st.fixEs)}</p>
+                <p className="small">{L3(lang, st.fixEn, st.fixZh, st.fixEs, st.fixPt)}</p>
               </li>
             );
           })}
@@ -1648,19 +1650,20 @@ function FengShui({ lang, chart, profile, setSex, ask }: { lang: Lang; chart: Ch
 // ---------------- chart ----------------
 
 const ZODIAC_EMOJI: Record<string, string> = { 子: '🐭', 丑: '🐮', 寅: '🐯', 卯: '🐰', 辰: '🐲', 巳: '🐍', 午: '🐴', 未: '🐑', 申: '🐵', 酉: '🐔', 戌: '🐶', 亥: '🐷' };
-const DM_LINE: Record<string, { en: string; zh: string; es: string }> = {
-  甲: { en: 'Like a tall tree: upright, steady, always growing toward a goal.', zh: '像参天大树：正直、稳当，总是一路往上长。', es: 'Como un árbol alto: recto, firme, siempre creciendo hacia una meta.' },
-  乙: { en: 'Like vines and flowers: flexible, easy to be around, always finds a way.', zh: '像花草藤蔓：灵活、好相处，总能找到出路。', es: 'Como enredaderas y flores: flexible, agradable, siempre encuentras un camino.' },
-  丙: { en: 'Like the sun: warm, open and generous; you light up a room.', zh: '像太阳：热情大方，走到哪儿亮到哪儿。', es: 'Como el sol: cálido, abierto y generoso; iluminas el lugar.' },
-  丁: { en: 'Like candlelight: thoughtful, warm, focused on what matters.', zh: '像烛光：细腻、温暖，专注在要紧的事上。', es: 'Como la luz de una vela: atento, cálido, centrado en lo que importa.' },
-  戊: { en: 'Like a mountain: reliable and calm; people feel safe around you.', zh: '像大山：可靠、沉稳，让人有安全感。', es: 'Como una montaña: confiable y sereno; la gente se siente segura contigo.' },
-  己: { en: 'Like garden soil: nurturing, practical and patient.', zh: '像田园沃土：会照顾人，务实、有耐心。', es: 'Como tierra de jardín: cuidas a los demás, práctico y paciente.' },
-  庚: { en: 'Like a blade: decisive and principled.', zh: '像一把刀：果断、讲原则。', es: 'Como una espada: decidido y con principios.' },
-  辛: { en: 'Like fine jewelry: refined, precise, with an eye for quality.', zh: '像珠宝：精致、讲究，眼光高。', es: 'Como una joya fina: refinado, preciso, con buen ojo para la calidad.' },
-  壬: { en: 'Like a great river: big-picture, adaptable, always moving.', zh: '像江河：眼界大、会变通，停不下来。', es: 'Como un gran río: visión amplia, adaptable, siempre en movimiento.' },
-  癸: { en: 'Like rain and dew: intuitive, gentle and quietly persistent.', zh: '像雨露：直觉强、温柔，默默坚持。', es: 'Como la lluvia y el rocío: intuitivo, amable y silenciosamente constante.' },
+const DM_LINE: Record<string, { en: string; zh: string; es: string; pt: string }> = {
+  甲: { en: 'Like a tall tree: upright, steady, always growing toward a goal.', zh: '像参天大树：正直、稳当，总是一路往上长。', es: 'Como un árbol alto: recto, firme, siempre creciendo hacia una meta.', pt: 'Como uma árvore alta: reto, firme, sempre crescendo rumo a uma meta.' },
+  乙: { en: 'Like vines and flowers: flexible, easy to be around, always finds a way.', zh: '像花草藤蔓：灵活、好相处，总能找到出路。', es: 'Como enredaderas y flores: flexible, agradable, siempre encuentras un camino.', pt: 'Como trepadeiras e flores: flexível, agradável, sempre encontra um caminho.' },
+  丙: { en: 'Like the sun: warm, open and generous; you light up a room.', zh: '像太阳：热情大方，走到哪儿亮到哪儿。', es: 'Como el sol: cálido, abierto y generoso; iluminas el lugar.', pt: 'Como o sol: caloroso, aberto e generoso; você ilumina o ambiente.' },
+  丁: { en: 'Like candlelight: thoughtful, warm, focused on what matters.', zh: '像烛光：细腻、温暖，专注在要紧的事上。', es: 'Como la luz de una vela: atento, cálido, centrado en lo que importa.', pt: 'Como a luz de uma vela: atencioso, caloroso, focado no que importa.' },
+  戊: { en: 'Like a mountain: reliable and calm; people feel safe around you.', zh: '像大山：可靠、沉稳，让人有安全感。', es: 'Como una montaña: confiable y sereno; la gente se siente segura contigo.', pt: 'Como uma montanha: confiável e sereno; as pessoas se sentem seguras com você.' },
+  己: { en: 'Like garden soil: nurturing, practical and patient.', zh: '像田园沃土：会照顾人，务实、有耐心。', es: 'Como tierra de jardín: cuidas a los demás, práctico y paciente.', pt: 'Como terra de jardim: cuida dos outros, prático e paciente.' },
+  庚: { en: 'Like a blade: decisive and principled.', zh: '像一把刀：果断、讲原则。', es: 'Como una espada: decidido y con principios.', pt: 'Como uma espada: decidido e com princípios.' },
+  辛: { en: 'Like fine jewelry: refined, precise, with an eye for quality.', zh: '像珠宝：精致、讲究，眼光高。', es: 'Como una joya fina: refinado, preciso, con buen ojo para la calidad.', pt: 'Como uma joia fina: refinado, preciso, com olho para a qualidade.' },
+  壬: { en: 'Like a great river: big-picture, adaptable, always moving.', zh: '像江河：眼界大、会变通，停不下来。', es: 'Como un gran río: visión amplia, adaptable, siempre en movimiento.', pt: 'Como um grande rio: visão ampla, adaptável, sempre em movimento.' },
+  癸: { en: 'Like rain and dew: intuitive, gentle and quietly persistent.', zh: '像雨露：直觉强、温柔，默默坚持。', es: 'Como la lluvia y el rocío: intuitivo, amable y silenciosamente constante.', pt: 'Como a chuva e o orvalho: intuitivo, gentil e silenciosamente persistente.' },
 };
 const ELS: Element[] = ['wood', 'fire', 'earth', 'metal', 'water'];
+const SUN_PT: Record<string, string> = { Aries: 'Áries', Taurus: 'Touro', Gemini: 'Gêmeos', Cancer: 'Câncer', Leo: 'Leão', Virgo: 'Virgem', Libra: 'Libra', Scorpio: 'Escorpião', Sagittarius: 'Sagitário', Capricorn: 'Capricórnio', Aquarius: 'Aquário', Pisces: 'Peixes' };
 const SUN_ES: Record<string, string> = { Aries: 'Aries', Taurus: 'Tauro', Gemini: 'Géminis', Cancer: 'Cáncer', Leo: 'Leo', Virgo: 'Virgo', Libra: 'Libra', Scorpio: 'Escorpio', Sagittarius: 'Sagitario', Capricorn: 'Capricornio', Aquarius: 'Acuario', Pisces: 'Piscis' };
 const EL_HAN: Record<Element, string> = { wood: '木', fire: '火', earth: '土', metal: '金', water: '水' };
 
@@ -1687,19 +1690,20 @@ function ChartView({ lang, chart, profile, onEdit }: { lang: Lang; chart: Chart;
   const dmEl = chart.dayMasterElement;
   const yinYang = ['甲', '丙', '戊', '庚', '壬'].includes(chart.dayMaster) ? (zh ? '阳' : 'Yang') : (zh ? '阴' : 'Yin');
   const es = lang === 'es';
+  const pt = lang === 'pt';
   return (
     <div className="stack">
       <h1>{t.myChart}</h1>
       <section className="card profcard">
         <div className="zav" aria-hidden="true">{ZODIAC_EMOJI[chart.yearBranch]}</div>
         <div className="grow">
-          <b>{profile.name || L3(lang, 'Me', '我', 'Yo')}</b>
+          <b>{profile.name || L3(lang, 'Me', '我', 'Yo', 'Eu')}</b>
           <div className="small muted">{bornStr}{profile.place ? ` · ${profile.place}` : ''}</div>
-          <div className="tiny">{zh ? `属${BRANCH[chart.yearBranch].zh} · ${chart.sunSign.zh}` : es ? `${ANIMAL_ES[BRANCH[chart.yearBranch].animal]} · ${SUN_ES[chart.sunSign.en] ?? chart.sunSign.en}` : `${BRANCH[chart.yearBranch].animal} · ${chart.sunSign.en}`} · {t.clockTimeNote}</div>
+          <div className="tiny">{zh ? `属${BRANCH[chart.yearBranch].zh} · ${chart.sunSign.zh}` : es ? `${ANIMAL_ES[BRANCH[chart.yearBranch].animal]} · ${SUN_ES[chart.sunSign.en] ?? chart.sunSign.en}` : pt ? `${ANIMAL_PT[BRANCH[chart.yearBranch].animal]} · ${SUN_PT[chart.sunSign.en] ?? chart.sunSign.en}` : `${BRANCH[chart.yearBranch].animal} · ${chart.sunSign.en}`} · {t.clockTimeNote}</div>
         </div>
       </section>
 
-      <div className="sechead"><h3>{L3(lang, 'Your four pillars', '你的四柱', 'Tus cuatro pilares')}</h3><span className="tiny">{L3(lang, 'top: stem · bottom: branch', '上：天干 · 下：地支', 'arriba: tronco · abajo: rama')}</span></div>
+      <div className="sechead"><h3>{L3(lang, 'Your four pillars', '你的四柱', 'Tus cuatro pilares', 'Seus quatro pilares')}</h3><span className="tiny">{L3(lang, 'top: stem · bottom: branch', '上：天干 · 下：地支', 'arriba: tronco · abajo: rama', 'em cima: tronco · embaixo: ramo')}</span></div>
       <div className="pillars">
         {chart.pillars.map((p) => {
           const hidden = p.label === 'hour' && chart.hourUnknown;
@@ -1707,7 +1711,7 @@ function ChartView({ lang, chart, profile, onEdit }: { lang: Lang; chart: Chart;
             <div key={p.label} className={`pillar ${p.label === 'day' ? 'dm' : ''}`}>
               <div className="k">{t[p.label]}{p.label === 'day' ? ` · ${v.you}` : ''}</div>
               <div className="gz">{hidden ? '?' : p.stem}<br />{hidden ? '?' : p.branch}</div>
-              {!hidden && <div className="elan">{zh ? `${ELEMENT_NAME[STEM[p.stem].el].zh}${BRANCH[p.branch].zh}` : es ? `${ANIMAL_ES[BRANCH[p.branch].animal]} de ${ELEMENT_NAME[STEM[p.stem].el].es}` : `${ELEMENT_NAME[STEM[p.stem].el].en} ${BRANCH[p.branch].animal}`}</div>}
+              {!hidden && <div className="elan">{zh ? `${ELEMENT_NAME[STEM[p.stem].el].zh}${BRANCH[p.branch].zh}` : es ? `${ANIMAL_ES[BRANCH[p.branch].animal]} de ${ELEMENT_NAME[STEM[p.stem].el].es}` : pt ? `${ANIMAL_PT[BRANCH[p.branch].animal]} de ${ELEMENT_NAME[STEM[p.stem].el].pt}` : `${ELEMENT_NAME[STEM[p.stem].el].en} ${BRANCH[p.branch].animal}`}</div>}
               <div className="area">{v.areas[p.label]}</div>
               {!hidden && <div className="tiny" title={t.hiddenStems}>{t.hiddenShort} {HIDDEN[p.branch].join('')}</div>}
             </div>
@@ -1720,7 +1724,7 @@ function ChartView({ lang, chart, profile, onEdit }: { lang: Lang; chart: Chart;
           <div className="dmchar" aria-hidden="true">{chart.dayMaster}</div>
           <div className="grow">
             <div className="tiny">{v.dmLabel}</div>
-            <h3>{zh ? `${yinYang}${ELEMENT_NAME[dmEl].zh} · ${chart.strong ? t.strong : t.weak}` : es ? `${ELEMENT_NAME[dmEl].es} ${yinYang} · ${chart.strong ? t.strong : t.weak}` : `${yinYang} ${ELEMENT_NAME[dmEl].en} · ${chart.strong ? t.strong : t.weak}`}</h3>
+            <h3>{zh ? `${yinYang}${ELEMENT_NAME[dmEl].zh} · ${chart.strong ? t.strong : t.weak}` : es || pt ? `${ELEMENT_NAME[dmEl][lang as 'es' | 'pt']} ${yinYang} · ${chart.strong ? t.strong : t.weak}` : `${yinYang} ${ELEMENT_NAME[dmEl].en} · ${chart.strong ? t.strong : t.weak}`}</h3>
             <p className="small">{DM_LINE[chart.dayMaster][lang]}</p>
           </div>
         </div>
@@ -1785,6 +1789,7 @@ function Settings({ nativeApp, lang, setLang, ics, setIcs, billNote, gcal, gcalN
           <button className={lang === 'en' ? 'on' : ''} onClick={() => setLang('en')}>English</button>
           <button className={lang === 'zh' ? 'on' : ''} onClick={() => setLang('zh')}>中文</button>
           <button className={lang === 'es' ? 'on' : ''} onClick={() => setLang('es')}>Español</button>
+          <button className={lang === 'pt' ? 'on' : ''} onClick={() => setLang('pt')}>Português</button>
         </div>
       </section>
       {ACCOUNTS_ON && <InviteCard lang={lang} />}
@@ -2256,6 +2261,6 @@ function Icon({ name }: { name: Tab }) {
 // The device's preferred language: the first of the person's languages that FateCal speaks.
 function deviceLang(): Lang {
   const list = (navigator.languages?.length ? navigator.languages : [navigator.language]).filter(Boolean);
-  for (const x of list) { const p = x.toLowerCase().slice(0, 2); if (p === 'zh') return 'zh'; if (p === 'es') return 'es'; if (p === 'en') return 'en'; }
+  for (const x of list) { const p = x.toLowerCase().slice(0, 2); if (p === 'zh') return 'zh'; if (p === 'es') return 'es'; if (p === 'pt') return 'pt'; if (p === 'en') return 'en'; }
   return 'en';
 }

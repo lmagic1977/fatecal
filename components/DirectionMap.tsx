@@ -27,7 +27,7 @@ export default function DirectionMap({ lang, lucky, sha, shaLabel }: { lang: Lan
   const box = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<'ask' | 'locating' | 'ok' | 'denied'>('ask');
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null);
-  const L3 = (en: string, zh: string, es: string) => (lang === 'zh' ? zh : lang === 'es' ? es : en);
+  const L3 = (en: string, zh: string, es: string, pt?: string) => (lang === 'zh' ? zh : lang === 'es' ? es : lang === 'pt' ? (pt ?? es) : en);
 
   function locate() {
     if (!navigator.geolocation) { setState('denied'); return; }
@@ -67,7 +67,7 @@ export default function DirectionMap({ lang, lucky, sha, shaLabel }: { lang: Lan
       // N/E/S/W letters at the edge
       const NESW = lang === 'zh' ? ['北', '东', '南', '西'] : lang === 'es' ? ['N', 'E', 'S', 'O'] : ['N', 'E', 'S', 'W'];
       NESW.forEach((t, i) => L.marker(dest(pos.lat, pos.lng, i * 90, R * 1.18), { icon: L.divIcon({ className: 'dirpin', html: '' }), interactive: false }).addTo(map).bindTooltip(t, { permanent: true, direction: 'center', className: 'dirtip nesw' }));
-      L.circleMarker([pos.lat, pos.lng], { radius: 7, color: '#fff', weight: 3, fillColor: '#5B5BF0', fillOpacity: 1 }).addTo(map).bindTooltip(L3('You', '你在这里', 'Tú'), { direction: 'top', offset: [0, -6] });
+      L.circleMarker([pos.lat, pos.lng], { radius: 7, color: '#fff', weight: 3, fillColor: '#5B5BF0', fillOpacity: 1 }).addTo(map).bindTooltip(L3('You', '你在这里', 'Tú', 'Você'), { direction: 'top', offset: [0, -6] });
       map.fitBounds(L.latLng(pos.lat, pos.lng).toBounds(R * 2.6));
     });
     return () => { gone = true; map?.remove(); };
@@ -76,19 +76,19 @@ export default function DirectionMap({ lang, lucky, sha, shaLabel }: { lang: Lan
   if (state !== 'ok') {
     return (
       <div className="dirmap-ask">
-        <p className="small">{L3('See the lucky directions around where you are, on a map.', '在地图上看看你附近哪个方向吉、哪个方向要避开。', 'Mira en un mapa las direcciones de suerte a tu alrededor.')}</p>
+        <p className="small">{L3('See the lucky directions around where you are, on a map.', '在地图上看看你附近哪个方向吉、哪个方向要避开。', 'Mira en un mapa las direcciones de suerte a tu alrededor.', 'Veja num mapa as direções de sorte ao seu redor.')}</p>
         <button className="primary" onClick={locate} disabled={state === 'locating'}>
-          📍 {state === 'locating' ? L3('Finding you…', '正在定位…', 'Buscando…') : L3('Show on map', '在地图上显示', 'Ver en el mapa')}
+          📍 {state === 'locating' ? L3('Finding you…', '正在定位…', 'Buscando…', 'Localizando…') : L3('Show on map', '在地图上显示', 'Ver en el mapa', 'Ver no mapa')}
         </button>
-        {state === 'denied' && <p className="small danger">{L3('Location is off. Allow location for FateCal in Settings and try again.', '定位权限没打开。请在手机「设置」里允许随身吉历使用位置，再试一次。', 'La ubicación está desactivada. Actívala para FateCal en Ajustes.')}</p>}
-        <p className="tiny muted">{L3('Your location is only used on this phone to draw the map.', '位置只在这台手机上用来画地图，不会上传。', 'Tu ubicación solo se usa en este teléfono para dibujar el mapa.')}</p>
+        {state === 'denied' && <p className="small danger">{L3('Location is off. Allow location for FateCal in Settings and try again.', '定位权限没打开。请在手机「设置」里允许随身吉历使用位置，再试一次。', 'La ubicación está desactivada. Actívala para FateCal en Ajustes.', 'A localização está desativada. Ative para o FateCal nos Ajustes.')}</p>}
+        <p className="tiny muted">{L3('Your location is only used on this phone to draw the map.', '位置只在这台手机上用来画地图，不会上传。', 'Tu ubicación solo se usa en este teléfono para dibujar el mapa.', 'Sua localização só é usada neste celular para desenhar o mapa.')}</p>
       </div>
     );
   }
   return (
     <>
       <div ref={box} className="dirmap" />
-      <p className="tiny muted">{L3('Green = lucky directions, red = the day’s sha direction. Directions are true north on the map.', '绿色是吉方，红色是煞方。地图上方是正北。', 'Verde = direcciones de suerte; rojo = dirección sha. El norte está arriba.')}</p>
+      <p className="tiny muted">{L3('Green = lucky directions, red = the day’s sha direction. Directions are true north on the map.', '绿色是吉方，红色是煞方。地图上方是正北。', 'Verde = direcciones de suerte; rojo = dirección sha. El norte está arriba.', 'Verde = direções de sorte; vermelho = direção sha. O norte fica em cima.')}</p>
     </>
   );
 }

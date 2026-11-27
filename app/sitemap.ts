@@ -9,7 +9,8 @@ const alt = (p: string) => ({ languages: { en: `${SITE_URL}${p || '/'}`, 'zh-CN'
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
   const out: MetadataRoute.Sitemap = [];
-  for (const l of LANGS) out.push({ url: `${SITE_URL}${l || '/'}`, changeFrequency: 'weekly', priority: 1, lastModified: now, alternates: alt('') });
+  const home = { languages: { ...alt('').languages, 'pt-BR': `${SITE_URL}/pt` } };
+  for (const l of [...LANGS, '/pt']) out.push({ url: `${SITE_URL}${l || '/'}`, changeFrequency: 'weekly', priority: 1, lastModified: now, alternates: home });
   for (const l of LANGS) out.push({ url: `${SITE_URL}${l}/good-days`, changeFrequency: 'monthly', priority: 0.8, lastModified: now, alternates: alt('/good-days') });
   for (const g of GUIDE_SLUGS) for (const l of LANGS) out.push({ url: `${SITE_URL}${l}/guides/${g}`, changeFrequency: 'monthly', priority: 0.8, lastModified: now, alternates: alt(`/guides/${g}`) });
   for (const ym of featuredMonths()) for (const l of LANGS) out.push({ url: `${SITE_URL}${l}/good-days/${ym}`, changeFrequency: 'monthly', priority: 0.7, alternates: alt(`/good-days/${ym}`) });

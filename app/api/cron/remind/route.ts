@@ -35,7 +35,7 @@ export async function GET(req: Request) {
 async function remindOne(rec: Awaited<ReturnType<typeof allPush>>[number]) {
   const data = await readUserData(rec.uid);
   if (!data?.profile?.birth) return 0;
-  const lang = (['en', 'zh', 'es'].includes(String(data.langPick ?? data.lang ?? rec.lang)) ? (data.langPick ?? data.lang ?? rec.lang) : 'en') as Lang;
+  const lang = (['en', 'zh', 'es', 'pt'].includes(String(data.langPick ?? data.lang ?? rec.lang)) ? (data.langPick ?? data.lang ?? rec.lang) : 'en') as Lang;
   const t = T[lang];
   const tz = validTz(data.tz) ? data.tz : rec.tz;
   const chart = computeChart(data.profile.birth);
@@ -59,10 +59,10 @@ async function remindOne(rec: Awaited<ReturnType<typeof allPush>>[number]) {
       const r = readEvent(chart, e, evs);
       const alt = r.alternatives[0];
       const mins = Math.round((s - nowWall.getTime()) / 60000);
-      const title = lang === 'zh' ? `${mins} 分钟后：${e.title}` : lang === 'es' ? `En ${mins} min: ${e.title}` : `In ${mins} min: ${e.title}`;
+      const title = lang === 'zh' ? `${mins} 分钟后：${e.title}` : lang === 'es' ? `En ${mins} min: ${e.title}` : lang === 'pt' ? `Em ${mins} min: ${e.title}` : `In ${mins} min: ${e.title}`;
       let body = `${hm(new Date(e.start))} · ${r.score} ${t[r.verdict]}`;
-      if (r.verdict === 'bad') body += lang === 'zh' ? '。放慢一点，做好准备。' : lang === 'es' ? '. Ve con calma y prepárate bien.' : '. Take it slow and prepare well.';
-      if (r.verdict !== 'good' && alt && alt.start.slice(0, 10) === e.start.slice(0, 10)) body += lang === 'zh' ? ` 更顺：${hm(new Date(alt.start))}（${alt.score}）` : lang === 'es' ? ` Mejor: ${hm(new Date(alt.start))} (${alt.score})` : ` Better: ${hm(new Date(alt.start))} (${alt.score})`;
+      if (r.verdict === 'bad') body += lang === 'zh' ? '。放慢一点，做好准备。' : lang === 'es' ? '. Ve con calma y prepárate bien.' : lang === 'pt' ? '. Vá com calma e prepare-se bem.' : '. Take it slow and prepare well.';
+      if (r.verdict !== 'good' && alt && alt.start.slice(0, 10) === e.start.slice(0, 10)) body += lang === 'zh' ? ` 更顺：${hm(new Date(alt.start))}（${alt.score}）` : lang === 'es' ? ` Mejor: ${hm(new Date(alt.start))} (${alt.score})` : lang === 'pt' ? ` Melhor: ${hm(new Date(alt.start))} (${alt.score})` : ` Better: ${hm(new Date(alt.start))} (${alt.score})`;
       n += await sendAll(rec, { title, body, url: '/', tag: key });
       sentLog[key] = Date.now();
     }
@@ -75,11 +75,11 @@ async function remindOne(rec: Awaited<ReturnType<typeof allPush>>[number]) {
     const best = d.bestHours[0];
     const count = evs.filter((e) => e.start.slice(0, 10) === today).length;
     const p2 = (x: number) => `${String(x).padStart(2, '0')}:00`;
-    const title = lang === 'zh' ? `今天 ${d.score} 分 · ${t[d.verdict]}` : lang === 'es' ? `Hoy: ${d.score} · ${t[d.verdict]}` : `Today: ${d.score} · ${t[d.verdict]}`;
+    const title = lang === 'zh' ? `今天 ${d.score} 分 · ${t[d.verdict]}` : lang === 'es' ? `Hoy: ${d.score} · ${t[d.verdict]}` : lang === 'pt' ? `Hoje: ${d.score} · ${t[d.verdict]}` : `Today: ${d.score} · ${t[d.verdict]}`;
     const body = [
       t.verdictLine[d.verdict].replace('{w}', '今天'),
-      best ? (lang === 'zh' ? `最顺 ${p2(best.start)}–${p2(best.start + 2)}` : lang === 'es' ? `Mejor franja ${p2(best.start)}–${p2(best.start + 2)}` : `Best window ${p2(best.start)}–${p2(best.start + 2)}`) : '',
-      count ? (lang === 'zh' ? `今天有 ${count} 个日程` : lang === 'es' ? `${count} evento${count > 1 ? 's' : ''} hoy` : `${count} event${count > 1 ? 's' : ''} today`) : '',
+      best ? (lang === 'zh' ? `最顺 ${p2(best.start)}–${p2(best.start + 2)}` : lang === 'es' ? `Mejor franja ${p2(best.start)}–${p2(best.start + 2)}` : lang === 'pt' ? `Melhor horário ${p2(best.start)}–${p2(best.start + 2)}` : `Best window ${p2(best.start)}–${p2(best.start + 2)}`) : '',
+      count ? (lang === 'zh' ? `今天有 ${count} 个日程` : lang === 'es' ? `${count} evento${count > 1 ? 's' : ''} hoy` : lang === 'pt' ? `${count} evento${count > 1 ? 's' : ''} hoje` : `${count} event${count > 1 ? 's' : ''} today`) : '',
     ].filter(Boolean).join(lang === 'zh' ? '。' : '. ');
     n += await sendAll(rec, { title, body, url: '/', tag: `am:${today}` });
     sentLog[`am:${today}`] = Date.now();

@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     },
     payment_method_collection: 'always',
     allow_promotion_codes: true,
-    locale: b.lang === 'zh' ? 'zh' : 'en',
+    locale: b.lang === 'zh' ? 'zh' : b.lang === 'es' ? 'es' : b.lang === 'pt' ? 'pt-BR' : 'en',
     client_reference_id: u.uid,
     success_url: `${SITE_URL}/?billing=success`,
     cancel_url: `${SITE_URL}/?billing=cancel`,

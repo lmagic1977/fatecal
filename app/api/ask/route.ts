@@ -64,7 +64,7 @@ export async function POST(req: Request) {
   const tz = typeof body.tz === 'string' && /^[A-Za-z_]+\/[A-Za-z_\/-]+$/.test(body.tz) ? body.tz : 'America/Los_Angeles';
   let iching = '';
   try { iching = JSON.stringify(timeHexagram(tz)); } catch {}
-  const lang = body.lang === 'zh' ? 'zh' : body.lang === 'es' ? 'es' : 'en';
+  const lang = body.lang === 'zh' ? 'zh' : body.lang === 'es' ? 'es' : body.lang === 'pt' ? 'pt' : 'en';
   const img = body.image && typeof body.image.data === 'string' && /^image\/(jpeg|png|webp|gif)$/.test(body.image.media_type) && body.image.data.length < 4_000_000 ? body.image : null;
 
   // plan limits: photo questions and questions per day
@@ -85,7 +85,7 @@ export async function POST(req: Request) {
       role: 'user',
       content: [
         ...(img ? [{ type: 'image' as const, source: { type: 'base64' as const, media_type: img.media_type, data: img.data } }] : []),
-        { type: 'text' as const, text: `<lang>${lang}</lang>\n<context>${context}</context>\n<iching>${iching}</iching>\n\n${question || (lang === 'zh' ? '帮我看看这张图的风水，合不合我？' : lang === 'es' ? '¿Qué significa esta foto para mí? ¿Encaja con mi carta?' : 'What does this photo mean for me? Is it a good fit for my chart?')}` },
+        { type: 'text' as const, text: `<lang>${lang}</lang>\n<context>${context}</context>\n<iching>${iching}</iching>\n\n${question || (lang === 'zh' ? '帮我看看这张图的风水，合不合我？' : lang === 'es' ? '¿Qué significa esta foto para mí? ¿Encaja con mi carta?' : lang === 'pt' ? 'O que esta foto significa para mim? Combina com meu mapa?' : 'What does this photo mean for me? Is it a good fit for my chart?')}` },
       ],
     },
   ];
